@@ -17,12 +17,21 @@ load_dotenv()
 current_language = load_current_language()
 internet_access = config['INTERNET_ACCESS']
 
-client = AsyncOpenAI(
-    base_url=config['API_BASE_URL'],
-    api_key="nah-ha",
-)
+client = None
+
+
+def get_ai_client():
+    global client
+    if client is None:
+        key = os.getenv('AI_API_KEY') or os.getenv('OPENAI_API_KEY')
+        if not key:
+            raise ValueError('Configure AI_API_KEY and AI_API_BASE_URL to use the AI service.')
+        client = AsyncOpenAI(base_url=os.getenv('AI_API_BASE_URL', config['API_BASE_URL']), api_key=key)
+    return client
+
 
 async def generate_response(instructions, history):
+    client = get_ai_client()
     messages = [
             {"role": "system", "name": "instructions", "content": instructions},
             *history,

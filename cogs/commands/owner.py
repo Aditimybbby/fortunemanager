@@ -1,4 +1,5 @@
 from __future__ import annotations
+from fortune.legacy_storage import legacy_directory, legacy_path
 from discord.ext import commands
 from discord import *
 from PIL import Image, ImageDraw, ImageFont
@@ -47,7 +48,7 @@ BADGE_NAMES = {
 }
 
 
-db_folder = 'db'
+db_folder = legacy_directory()
 db_file = 'badges.db'
 db_path = os.path.join(db_folder, db_file)
 FONT_PATH = os.path.join('utils', 'arial.ttf')
@@ -156,7 +157,7 @@ class Owner(commands.Cog):
         self.client = client
         self.staff = set()
         self.np_cache = []
-        self.db_path = 'db/np.db'
+        self.db_path = legacy_path('np.db')
         self.stop_tour = False
         self.bot_owner_ids = [213347081799073793, 677952614390038559]
         self.client.loop.create_task(self.setup_database())
@@ -780,7 +781,7 @@ class Owner(commands.Cog):
 class Badges(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
-        self.db_path = 'db/np.db'
+        self.db_path = legacy_path('np.db')
 
         
     @commands.hybrid_command(aliases=['profile', 'pr'])

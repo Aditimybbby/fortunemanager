@@ -61,7 +61,7 @@ class Errors(Cog):
 
     if isinstance(error, commands.CommandOnCooldown):
       embed = discord.Embed(color=0x000000, description=f"{ctx.author.mention} Whoa, slow down there! You can run the command again in **{error.retry_after:.2f}** seconds.")
-      embed.set_author(name="Cooldown", icon_url=self.client.user.avatar.url)
+      embed.set_author(name="Cooldown", icon_url=self.client.user.display_avatar.url)
       embed.set_thumbnail(url="https://cdn.discordapp.com/emojis/1251052632949395538.png")
       embed.set_footer(text=f"Requested by {ctx.author}", icon_url=ctx.author.avatar.url if ctx.author.avatar else ctx.author.default_avatar.url)
       await ctx.reply(embed=embed, delete_after=10)
@@ -69,7 +69,7 @@ class Errors(Cog):
 
     if isinstance(error, commands.MaxConcurrencyReached):
       embed = discord.Embed(color=0x000000, description=f"{ctx.author.mention} This command is already in progress. Please let it finish and try again afterward.")
-      embed.set_author(name="Command in Progress.", icon_url=self.client.user.avatar.url)
+      embed.set_author(name="Command in Progress.", icon_url=self.client.user.display_avatar.url)
       embed.set_thumbnail(url="https://cdn.discordapp.com/emojis/1251052632949395538.png")
       embed.set_footer(text=f"Requested by {ctx.author}", icon_url=ctx.author.avatar.url if ctx.author.avatar else ctx.author.default_avatar.url)
       await ctx.reply(embed=embed, delete_after=10)
@@ -80,7 +80,7 @@ class Errors(Cog):
       missing = [perm.replace("_", " ").replace("guild", "server").title() for perm in error.missing_permissions]
       fmt = "{}, and {}".format(", ".join(missing[:-1]), missing[-1]) if len(missing) > 2 else " and ".join(missing)
       embed = discord.Embed(color=0x000000, description=f"You lack the **{fmt}** Permission to run the **{ctx.command.name}** command!")
-      embed.set_author(name="Missing Permissions", icon_url=self.client.user.avatar.url)
+      embed.set_author(name="Missing Permissions", icon_url=self.client.user.display_avatar.url)
       embed.set_thumbnail(url="https://cdn.discordapp.com/emojis/1227625594511163537.png")
       embed.set_footer(text=f"Requested by {ctx.author}", icon_url=ctx.author.avatar.url if ctx.author.avatar else ctx.author.default_avatar.url)
       await ctx.reply(embed=embed, delete_after=7)

@@ -1,3 +1,4 @@
+from fortune.legacy_storage import legacy_path
 from utils import getConfig  
 import discord
 from discord.ext import commands
@@ -12,7 +13,7 @@ class Mention(commands.Cog):
         self.bot_name = "FortuneManager"
 
     async def is_blacklisted(self, message):
-        async with aiosqlite.connect("db/block.db") as db:
+        async with aiosqlite.connect(legacy_path('block.db')) as db:
             cursor = await db.execute("SELECT 1 FROM guild_blacklist WHERE guild_id = ?", (message.guild.id,))
             if await cursor.fetchone():
                 return True
@@ -51,8 +52,8 @@ class Mention(commands.Cog):
                     color=self.color,
                     description=f"Hey {message.author.mention},\nPrefix For This Server is `{prefix}`\nServer ID: {message.guild.id}\n\nType `{prefix}help` for more information."
                 )
-                embed.set_thumbnail(url=self.bot.user.avatar.url)
-                embed.set_footer(text="Powered by FortuneManager Development™", icon_url=self.bot.user.avatar.url)
+                embed.set_thumbnail(url=self.bot.user.display_avatar.url)
+                embed.set_footer(text="Powered by FortuneManager Development™", icon_url=self.bot.user.display_avatar.url)
 
                 buttons = [
                     discord.ui.Button(label="Invite", style=discord.ButtonStyle.link, url="https://discord.com/oauth2/authorize?client_id=1144179659735572640&permissions=2113268958&scope=bot"),

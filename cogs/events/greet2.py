@@ -1,3 +1,4 @@
+from fortune.legacy_storage import legacy_path
 import discord
 import aiosqlite
 import json
@@ -30,7 +31,7 @@ class greet(commands.Cog):
     async def process_queue(self, guild):
         while self.join_queue[guild.id]:
             member = self.join_queue[guild.id].pop(0)
-            async with aiosqlite.connect("db/welcome.db") as db:
+            async with aiosqlite.connect(legacy_path('welcome.db')) as db:
                 async with db.execute("SELECT welcome_type, welcome_message, channel_id, embed_data, auto_delete_duration FROM welcome WHERE guild_id = ?", (guild.id,)) as cursor:
                     row = await cursor.fetchone()
             if row is None:

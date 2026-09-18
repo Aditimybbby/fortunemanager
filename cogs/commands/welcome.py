@@ -1,3 +1,4 @@
+from fortune.legacy_storage import legacy_path
 import discord
 from discord.ext import commands
 from discord.ui import View, Select, Button
@@ -47,10 +48,13 @@ class VariableButton(Button):
 class Welcomer(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
-        self.bot.loop.create_task(self._create_table())
+
+    async def cog_load(self):
+        await self._create_table()
+
 
     async def _create_table(self):
-        async with aiosqlite.connect("db/welcome.db") as db:
+        async with aiosqlite.connect(legacy_path('welcome.db')) as db:
             await db.execute("""
             CREATE TABLE IF NOT EXISTS welcome (
                 guild_id INTEGER PRIMARY KEY,
@@ -78,7 +82,7 @@ class Welcomer(commands.Cog):
     @commands.cooldown(1, 6, commands.BucketType.user)
     @commands.max_concurrency(1, per=commands.BucketType.default, wait=False)
     async def greet_setup(self, ctx):
-        async with aiosqlite.connect("db/welcome.db") as db:
+        async with aiosqlite.connect(legacy_path('welcome.db')) as db:
             async with db.execute("SELECT * FROM welcome WHERE guild_id = ?", (ctx.guild.id,)) as cursor:
                 row = await cursor.fetchone()
         
@@ -232,7 +236,7 @@ class Welcomer(commands.Cog):
 
     
     async def _save_welcome_data(self, guild_id, welcome_type, message, embed_data=None):
-        async with aiosqlite.connect("db/welcome.db") as db:
+        async with aiosqlite.connect(legacy_path('welcome.db')) as db:
             await db.execute("""
             INSERT OR REPLACE INTO welcome (guild_id, welcome_type, welcome_message, embed_data)
             VALUES (?, ?, ?, ?)
@@ -416,7 +420,7 @@ class Welcomer(commands.Cog):
     @commands.cooldown(1, 6, commands.BucketType.user)
     @commands.max_concurrency(1, per=commands.BucketType.default, wait=False)
     async def greet_reset(self, ctx):
-        async with aiosqlite.connect("db/welcome.db") as db:
+        async with aiosqlite.connect(legacy_path('welcome.db')) as db:
             cursor = await db.execute("SELECT 1 FROM welcome WHERE guild_id = ?", (ctx.guild.id,))
             is_set_up = await cursor.fetchone()
 
@@ -439,7 +443,7 @@ class Welcomer(commands.Cog):
                 await interaction.response.send_message("Only the command author can confirm this action.", ephemeral=True)
                 return
 
-            async with aiosqlite.connect("db/welcome.db") as db:
+            async with aiosqlite.connect(legacy_path('welcome.db')) as db:
                 await db.execute("DELETE FROM welcome WHERE guild_id = ?", (ctx.guild.id,))
                 await db.commit()
 
@@ -475,7 +479,7 @@ class Welcomer(commands.Cog):
     @commands.cooldown(1, 6, commands.BucketType.user)
     @commands.max_concurrency(1, per=commands.BucketType.default, wait=False)
     async def greet_channel(self, ctx):
-        async with aiosqlite.connect("db/welcome.db") as db:
+        async with aiosqlite.connect(legacy_path('welcome.db')) as db:
             async with db.execute("SELECT welcome_type, channel_id FROM welcome WHERE guild_id = ?", (ctx.guild.id,)) as cursor:
                 result = await cursor.fetchone()
                 welcome_message = result[0] if result else None
@@ -509,7 +513,7 @@ class Welcomer(commands.Cog):
                 selected_channel_id = int(select_menu.values[0])
                 selected_channel = ctx.guild.get_channel(selected_channel_id)
 
-                async with aiosqlite.connect("db/welcome.db") as db:
+                async with aiosqlite.connect(legacy_path('welcome.db')) as db:
                     await db.execute("UPDATE welcome SET channel_id = ? WHERE guild_id = ?", (selected_channel_id, ctx.guild.id))
                     await db.commit()
 
@@ -565,7 +569,7 @@ class Welcomer(commands.Cog):
     @commands.cooldown(1, 6, commands.BucketType.user)
     @commands.max_concurrency(1, per=commands.BucketType.default, wait=False)
     async def greet_test(self, ctx):
-        async with aiosqlite.connect("db/welcome.db") as db:
+        async with aiosqlite.connect(legacy_path('welcome.db')) as db:
             async with db.execute("SELECT welcome_type, welcome_message, channel_id, embed_data FROM welcome WHERE guild_id = ?", (ctx.guild.id,)) as cursor:
                 row = await cursor.fetchone()
 
@@ -665,7 +669,7 @@ class Welcomer(commands.Cog):
     @commands.cooldown(1, 6, commands.BucketType.user)
     @commands.max_concurrency(1, per=commands.BucketType.default, wait=False)
     async def greet_config(self, ctx):
-        async with aiosqlite.connect("db/welcome.db") as db:
+        async with aiosqlite.connect(legacy_path('welcome.db')) as db:
             async with db.execute("SELECT * FROM welcome WHERE guild_id = ?", (ctx.guild.id,)) as cursor:
                 row = await cursor.fetchone()
 
@@ -735,7 +739,7 @@ class Welcomer(commands.Cog):
             return
 
         
-        async with aiosqlite.connect("db/welcome.db") as db:
+        async with aiosqlite.connect(legacy_path('welcome.db')) as db:
             await db.execute("""
             UPDATE welcome
             SET auto_delete_duration = ?
@@ -754,7 +758,7 @@ class Welcomer(commands.Cog):
     @commands.cooldown(1, 6, commands.BucketType.user)
     @commands.max_concurrency(1, per=commands.BucketType.default, wait=False)
     async def greet_edit(self, ctx):
-        async with aiosqlite.connect("db/welcome.db") as db:
+        async with aiosqlite.connect(legacy_path('welcome.db')) as db:
             async with db.execute("SELECT welcome_type, welcome_message, embed_data FROM welcome WHERE guild_id = ?", (ctx.guild.id,)) as cursor:
                 row = await cursor.fetchone()
 
@@ -805,7 +809,7 @@ class Welcomer(commands.Cog):
                         await ctx.send("Setup was canceled. No changes were made.")
                         return
                     await new_message.delete()
-                    async with aiosqlite.connect("db/welcome.db") as db:
+                    async with aiosqlite.connect(legacy_path('welcome.db')) as db:
                         await db.execute("UPDATE welcome SET welcome_message = ? WHERE guild_id = ?", (new_message.content, ctx.guild.id))
                         await db.commit()
 
@@ -909,7 +913,7 @@ class Welcomer(commands.Cog):
                             else:
                                 embed_data_json[selected_option] = url_or_text
 
-                        async with aiosqlite.connect("db/welcome.db") as db:
+                        async with aiosqlite.connect(legacy_path('welcome.db')) as db:
                             await db.execute("UPDATE welcome SET embed_data = ? WHERE guild_id = ?", (json.dumps(embed_data_json), ctx.guild.id))
                             await db.commit()
 

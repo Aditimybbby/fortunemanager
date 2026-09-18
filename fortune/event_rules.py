@@ -1,7 +1,7 @@
 """Event policy and deterministic reward calculation (no Discord I/O)."""
 import calendar
 import re
-from datetime import datetime
+from datetime import datetime, timezone
 from decimal import Decimal, ROUND_HALF_UP
 
 RULES = '''Event Rules
@@ -102,6 +102,31 @@ def four_months_before(value):
     return value.replace(year=year, month=month, day=min(value.day, calendar.monthrange(year, month)[1]))
 
 
+def utc_time(value):
+    """Compare instants, not ISO text with different offsets or precision."""
+    parsed = datetime.fromisoformat(value) if isinstance(value, str) else value
+    return parsed.replace(tzinfo=timezone.utc) if parsed.tzinfo is None else parsed.astimezone(timezone.utc)
+
+
+def invite_window(rows, start, cutoff):
+    start, cutoff = utc_time(start), utc_time(cutoff)
+    accepted = []
+    summary = dict(total_verified=len(rows), before_event=0, after_cutoff=0, invalid_timestamp=0)
+    for row in rows:
+        try:
+            joined = utc_time(row['joined_at'])
+        except (TypeError, ValueError):
+            summary['invalid_timestamp'] += 1
+            continue
+        if joined < start:
+            summary['before_event'] += 1
+        elif joined > cutoff:
+            summary['after_cutoff'] += 1
+        else:
+            accepted.append(row)
+    return accepted, summary
+
+
 def calculate(rows, rewards, *, rules, promo, at, findings=(), proof_overdue=False, selected_threshold=None):
     raw = len(rows)
     deductions, blocked = [], []
@@ -121,7 +146,7 @@ def calculate(rows, rewards, *, rules, promo, at, findings=(), proof_overdue=Fal
                     blocked.append(f'RESET: {uid} has no profile picture')
             if row.get('onboarding_missing'):
                 deductions.append((f'{uid}: onboarding incomplete', 1 if promo == 'server' else 3))
-            if datetime.fromisoformat(row['account_created_at']) > four_months_before(at):
+            if utc_time(row['account_created_at']) > four_months_before(utc_time(at)):
                 deductions.append((f'{uid}: account under four months', 1 if promo == 'server' else 3))
         for finding in findings:
             action, dm, server = MANUAL_RULES[finding['code']]

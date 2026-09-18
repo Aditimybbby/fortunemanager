@@ -1,3 +1,4 @@
+from fortune.legacy_storage import legacy_path
 import discord
 from discord.ext import commands
 import aiosqlite
@@ -5,12 +6,15 @@ import os
 from utils.Tools import *
 
 
-DB_PATH = "db/autoresponder.db"
+DB_PATH = legacy_path('autoresponder.db')
 
 class AutoResponder(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
-        self.bot.loop.create_task(self.initialize_db())
+
+    async def cog_load(self):
+        await self.initialize_db()
+
 
     async def initialize_db(self):
         if not os.path.exists(os.path.dirname(DB_PATH)):

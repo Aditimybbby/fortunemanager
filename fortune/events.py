@@ -9,7 +9,7 @@ from urllib.parse import urlparse
 import discord
 from discord.ext import commands
 from .branding import embed
-from .event_rules import RULES, MANUAL_RULES, parse_rewards, calculate, reward_for
+from .event_rules import RULES, MANUAL_RULES, parse_rewards, calculate, reward_for, invite_window, utc_time
 from .permissions import admin, require_admin
 from .store import now
 from .tickets import SafeView, TicketControls, reply
@@ -475,11 +475,14 @@ class Events(commands.Cog):
     async def evaluate(self,guild,claim):
         event=await self.bot.store.one('SELECT * FROM events WHERE id=?',(claim['event_id'],))
         data=json.loads(event['data'])
-        cutoff=min(claim['cutoff'],event['ended_at'] or claim['cutoff'])
-        rows=await self.bot.store.rows("SELECT * FROM invite_members WHERE guild_id=? AND inviter_id=? AND source='invite' AND joined_at>=? AND joined_at<=?",(guild.id,claim['user_id'],event['started_at'],cutoff))
+        cutoff=min(utc_time(claim['cutoff']), utc_time(event['ended_at'] or claim['cutoff'])).isoformat()
+        verified=await self.bot.store.rows("SELECT * FROM invite_members WHERE guild_id=? AND inviter_id=? AND source='invite'",(guild.id,claim['user_id']))
+        rows,window=invite_window(verified,event['started_at'],cutoff)
         unavailable=[]
         at=discord.utils.utcnow()
-        for row in rows:
+        # No-rules events need verified attribution and the time window only;
+        # a profile lookup failure must not disqualify an otherwise valid claim.
+        for row in rows if data['rules'] else []:
             moves=await self.bot.store.rows('SELECT kind FROM member_movements WHERE guild_id=? AND member_id=? AND at>=?',(guild.id,row['member_id'],row['joined_at']))
             row['left']=any(m['kind']=='leave' for m in moves)
             row['rejoined']=any(m['kind']=='rejoin' for m in moves)
@@ -491,34 +494,59 @@ class Events(commands.Cog):
             except discord.HTTPException:
                 unavailable.append(row['member_id'])
                 continue
-            row['no_avatar']=member.avatar is None
+            row['no_avatar']=member.avatar is None and getattr(member,'guild_avatar',None) is None
             row['onboarding_missing']='COMMUNITY' in guild.features and 'GUILD_ONBOARDING' in guild.features and not member.flags.completed_onboarding
         findings=await self.bot.store.rows('SELECT * FROM event_findings WHERE event_id=? AND user_id=? AND active=1',(event['id'],claim['user_id']))
         proof=await self.bot.store.one('SELECT created_at FROM event_proofs WHERE guild_id=? AND user_id=? AND source_channel_id=? ORDER BY created_at LIMIT 1',(guild.id,claim['user_id'],claim['channel_id']))
-        deadline=datetime.fromisoformat(claim['cutoff'])+timedelta(days=5)
-        proof_overdue=at>deadline and (not proof or datetime.fromisoformat(proof['created_at'])>deadline)
+        deadline=utc_time(claim['cutoff'])+timedelta(days=5)
+        proof_overdue=at>deadline and (not proof or utc_time(proof['created_at'])>deadline)
         result=calculate(rows,data['rewards'],rules=data['rules'],promo=claim['promo'] or 'dm',at=at,findings=findings,proof_overdue=proof_overdue,selected_threshold=claim.get('selected_reward'))
-        result.update(unavailable=unavailable,proof=bool(proof),rules=data['rules'],cutoff=cutoff)
+        result.update(unavailable=unavailable,proof=bool(proof),rules=data['rules'],cutoff=cutoff,started_at=event['started_at'],window=window)
         if unavailable:
             result['blocked'].append('Verification incomplete: Discord member lookup failed; retry later.')
-            result['reward']='No reward'
+            result['reward']='Verification pending'
         return event,data,result
 
     async def present_rewards(self,guild,channel,claim):
-        _,data,result=await self.evaluate(guild,claim)
+        evaluation=await self.evaluate(guild,claim)
+        _,data,result=evaluation
         available=[r for r in data['rewards'] if r['threshold']<=result['eligible']]
         if result['blocked'] or not available:
-            await self.report(guild,channel,claim)
-            await channel.send(embed=embed('No eligible reward choices','Resolve the findings or invite requirements before choosing a reward. New invites after this ticket opened do not count.'))
+            await self.report(guild,channel,claim,evaluation=evaluation)
+            if result['unavailable']:
+                title='Invite verification pending'
+                reason='Discord could not verify some member profiles. Retry `.check` shortly. Your verified invites have not been removed.'
+            elif result['blocked']:
+                title='Reward claim blocked by event rules'
+                reason='\n'.join(result['blocked'])+'\nStaff can review the findings above. An incorrect manual finding can be removed with `.eventunflag ID reason`.'
+            elif result['raw']==0:
+                title='No verified invites in this event window'
+                reason='Only invites earned after this event started and before this ticket opened count. See the invite breakdown above.'
+            else:
+                threshold=min(r['threshold'] for r in data['rewards'])
+                title='Reward threshold not reached'
+                reason=f'You have {result["eligible"]} eligible invites after deductions; the first reward requires {threshold}. See the deductions and rounding above.'
+            await channel.send(embed=embed(title,reason[:3500]))
             return
         await channel.send(embed=embed('Choose your reward',
-            f'<@{claim["user_id"]}>, you have **{result["eligible"]} eligible invites** after deductions.\nChoose the reward you want from the dropdown. You may choose any eligible option.\nYour choice is saved for staff review; no reward is selected automatically.'),
+            f'<@{claim["user_id"]}>, you have **{result["eligible"]} eligible invites** after deductions.\n'
+            f'Verified during this event, before ticket: **{result["raw"]}**. '
+            f'Deducted: **{sum(n for _,n in result["deductions"])}**; rounded down: **{result["rounded"]}**.\n'
+            'Choose the reward you want from the dropdown. You may choose any eligible option.\nYour choice is saved for staff review; no reward is selected automatically.'),
             view=RewardView(self,claim,data['rewards'],result['eligible']))
 
-    async def report(self,guild,channel,claim):
-        event,data,result=await self.evaluate(guild,claim)
+    async def report(self,guild,channel,claim,*,evaluation=None):
+        event,data,result=evaluation or await self.evaluate(guild,claim)
         await self.bot.store.execute('UPDATE event_claims SET result=? WHERE id=?',(json.dumps(result),claim['id']))
         e=embed(f'Event #{event["id"]} · Claim #{claim["id"]}',f'Member: <@{claim["user_id"]}>\nPromo: **{claim["promo"]}**\nVerified joins before ticket: **{result["raw"]}**\nEligible invites: **{result["eligible"]}**\nCalculated reward: **{result["reward"]}**\nStatus: **PENDING STAFF REVIEW**')
+        window=result['window']
+        e.add_field(name='Invite count breakdown',value=(
+            f'All-time verified: **{window["total_verified"]}**\n'
+            f'Excluded before event: **{window["before_event"]}**\n'
+            f'Excluded after ticket/event end: **{window["after_cutoff"]}**\n'
+            f'Invalid join timestamp: **{window["invalid_timestamp"]}**\n'
+            f'Event start (UTC): {utc_time(event["started_at"]).isoformat()}\n'
+            f'Invite cutoff (UTC): {result["cutoff"]}'),inline=False)
         chosen=next((r for r in data['rewards'] if r['threshold']==claim.get('selected_reward')),None)
         e.add_field(name='User-selected reward',value=f"{chosen['threshold']} invites = {chosen['label']}" if chosen else 'Not selected — ticket owner must choose via `.check`.',inline=False)
         deductions='\n'.join(f'−{amount}: {reason}' for reason,amount in result['deductions']) or 'None'

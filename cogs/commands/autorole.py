@@ -1,4 +1,5 @@
 from __future__ import annotations
+from fortune.legacy_storage import legacy_path
 import discord
 import aiosqlite
 import logging
@@ -12,7 +13,7 @@ logging.basicConfig(
     datefmt="%H:%M:%S",
 )
 
-DATABASE_PATH = 'db/autorole.db'
+DATABASE_PATH = legacy_path('autorole.db')
 
 class BasicView(discord.ui.View):
     def __init__(self, ctx: commands.Context, timeout=60):
@@ -20,7 +21,7 @@ class BasicView(discord.ui.View):
         self.ctx = ctx
 
     async def interaction_check(self, interaction: discord.Interaction):
-        if interaction.user.id != self.ctx.author.id and interaction.user.id not in [246469891761111051]:
+        if interaction.user.id != self.ctx.author.id:
             await interaction.response.send_message("Uh oh! That message doesn't belong to you.\nYou must run this command to interact with it.", ephemeral=True)
             return False
         return True
@@ -29,8 +30,11 @@ class BasicView(discord.ui.View):
 class AutoRole(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
-        self.bot.loop.create_task(self.create_table())
         self.color = 0x000000
+
+    async def cog_load(self):
+        await self.create_table()
+
 
     async def create_table(self):
         async with aiosqlite.connect(DATABASE_PATH) as db:

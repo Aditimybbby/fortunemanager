@@ -1,3 +1,4 @@
+from fortune.legacy_storage import legacy_path
 import discord
 from discord.ext import commands
 from discord import ui
@@ -37,10 +38,13 @@ class Warn(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
         self.color = discord.Color.from_rgb(0, 0, 0)
-        self.db_path = "db/warn.db"
+        self.db_path = legacy_path('warn.db')
 
         
-        asyncio.create_task(self.setup())
+
+    async def cog_load(self):
+        await self.setup()
+
 
     def get_user_avatar(self, user):
         return user.avatar.url if user.avatar else user.default_avatar.url

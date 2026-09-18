@@ -1,3 +1,4 @@
+from fortune.legacy_storage import legacy_path
 from discord.ext import commands, tasks
 from discord import *
 import discord
@@ -117,7 +118,7 @@ class NoPrefix(commands.Cog):
     def __init__(self, client):
         self.client = client
         self.staff = set()
-        self.db_path = 'db/np.db'
+        self.db_path = legacy_path('np.db')
         self.client.loop.create_task(self.load_staff())
         self.client.loop.create_task(self.setup_database())
         self.expiry_check.start()
@@ -277,7 +278,7 @@ class NoPrefix(commands.Cog):
     @_np.command(name="remove", help="Remove user from no-prefix")
     @commands.check(is_owner_or_staff)
     async def np_remove(self, ctx, user: discord.User):
-        async with aiosqlite.connect('db/np.db') as db:
+        async with aiosqlite.connect(legacy_path('np.db')) as db:
             async with db.execute("SELECT id FROM np WHERE id = ?", (user.id,)) as cursor:
                 result = await cursor.fetchone()
             if not result:
@@ -335,7 +336,7 @@ class NoPrefix(commands.Cog):
     @_np.command(name="status", help="Check if a user is in the No Prefix list and show details.")
     @commands.check(is_owner_or_staff)
     async def np_status(self, ctx, user: discord.User):
-        async with aiosqlite.connect('db/np.db') as db:
+        async with aiosqlite.connect(legacy_path('np.db')) as db:
             async with db.execute("SELECT id, expiry_time FROM np WHERE id = ?", (user.id,)) as cursor:
                 result = await cursor.fetchone()
 

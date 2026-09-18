@@ -1,3 +1,4 @@
+from fortune.legacy_storage import legacy_directory
 from discord.ext import commands, tasks
 import datetime, pytz, time as t
 from discord.ui import Button, Select, View
@@ -10,7 +11,7 @@ from utils.Tools import *
 import os
 import aiohttp
 
-db_folder = 'db'
+db_folder = legacy_directory()
 db_file = 'giveaways.db'
 db_path = os.path.join(db_folder, db_file)
 connection = sqlite3.connect(db_path)
@@ -61,10 +62,10 @@ class Giveaway(commands.Cog):
     async def cog_load(self) -> None:
         self.connection = await aiosqlite.connect(db_path)
         self.cursor = await self.connection.cursor()
-        await self.check_for_ended_giveaways() 
         self.GiveawayEnd.start()
 
     async def cog_unload(self) -> None:
+        self.GiveawayEnd.cancel()
         await self.connection.close()
 
     async def check_for_ended_giveaways(self):
@@ -214,7 +215,7 @@ class Giveaway(commands.Cog):
 
         embed.timestamp = embed.timestamp = ends_utc
         embed.set_thumbnail(url="https://cdn.discordapp.com/emojis/1267699441394126940.png")
-        embed.set_footer(text=f"Ends at", icon_url=ctx.bot.user.avatar.url)
+        embed.set_footer(text=f"Ends at", icon_url=ctx.bot.user.display_avatar.url)
 
         message = await ctx.send("🎁 **GIVEAWAY** 🎁", embed=embed)
         try:
@@ -229,6 +230,10 @@ class Giveaway(commands.Cog):
 
     
                                     
+
+    @GiveawayEnd.before_loop
+    async def before_giveaway_loop(self):
+        await self.bot.wait_until_ready()
 
     @commands.Cog.listener("on_message_delete")
     async def GiveawayMessageDelete(self, message):

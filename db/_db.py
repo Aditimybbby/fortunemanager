@@ -1,3 +1,4 @@
+from fortune.legacy_storage import legacy_path
 import aiosqlite
 import asyncio
 import random
@@ -9,7 +10,7 @@ class Database:
     db_path: str
     db: Optional[aiosqlite.Connection]
 
-    def __new__(cls, db_path='db/anti.db'):
+    def __new__(cls, db_path=legacy_path('anti.db')):
         if cls._instance is None:
             cls._instance = super().__new__(cls)
             cls._instance.db_path = db_path

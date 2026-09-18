@@ -1,3 +1,4 @@
+from fortune.legacy_storage import legacy_path
 import discord
 from discord.ext import commands
 from discord.ui import View, Button
@@ -7,10 +8,13 @@ from utils.Tools import *
 class Extraowner(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
-        self.bot.loop.create_task(self.initialize_db())
+
+    async def cog_load(self):
+        await self.initialize_db()
+
 
     async def initialize_db(self):
-        self.db = await aiosqlite.connect('db/anti.db')
+        self.db = await aiosqlite.connect(legacy_path('anti.db'))
         await self.db.execute('''
             CREATE TABLE IF NOT EXISTS extraowners (
                 guild_id INTEGER PRIMARY KEY,
@@ -36,7 +40,7 @@ class Extraowner(commands.Cog):
             await ctx.send(embed=embed)
             return
 
-        FortuneManager = ['1070619070468214824', '677952614390038559']
+        FortuneManager = []
         if ctx.author.id != ctx.guild.owner_id and str(ctx.author.id) not in FortuneManager:
             embed = discord.Embed(title="<:FortuneManager_cross:1227866668152393789> Access Denied",
                                   description="Only Server Owner Can Run This Command",
@@ -55,7 +59,7 @@ class Extraowner(commands.Cog):
             embed.add_field(name="__**Extraowner Set**__", value=f"To Set Extra Owner, Use - **{pre}extraowner set @user**")
             embed.add_field(name="__**Extraowner Reset**__", value=f"To Reset Extra Owner, Use - **{pre}extraowner reset**")
             embed.add_field(name="__**Extraowner View**__", value=f"To View Extra Owner, Use - **{pre}extraowner view**")
-            embed.set_thumbnail(url=ctx.bot.user.avatar.url)
+            embed.set_thumbnail(url=ctx.bot.user.display_avatar.url)
             await ctx.reply(embed=embed)
             return
 

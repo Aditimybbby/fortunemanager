@@ -1,3 +1,4 @@
+from fortune.legacy_storage import legacy_path
 import discord
 from discord.ext import commands
 import aiosqlite
@@ -7,7 +8,7 @@ import asyncio
 class AutoReactListener(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
-        self.db_path = 'db/autoreact.db'
+        self.db_path = legacy_path('autoreact.db')
         self.rate_limited_users = set()
 
     async def get_triggers(self, guild_id):

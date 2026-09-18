@@ -1,3 +1,4 @@
+from fortune.legacy_storage import legacy_path
 import discord
 from discord.ext import commands
 import aiosqlite
@@ -7,8 +8,11 @@ from utils.Tools import *
 class Invcrole(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
-        self.db_path = 'db/invc.db'
-        self.bot.loop.create_task(self.create_table())
+        self.db_path = legacy_path('invc.db')
+
+    async def cog_load(self):
+        await self.create_table()
+
 
     async def create_table(self):
         async with aiosqlite.connect(self.db_path) as db:

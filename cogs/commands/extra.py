@@ -1,3 +1,4 @@
+from fortune.legacy_storage import legacy_path
 import os 
 import discord
 from discord.ext import commands
@@ -929,7 +930,7 @@ class Extra(commands.Cog):
     
     db_latency = None
     try:
-      async with aiosqlite.connect("db/afk.db") as db:
+      async with aiosqlite.connect(legacy_path('afk.db')) as db:
         start_time = time.perf_counter()
         await db.execute("SELECT 1")
         end_time = time.perf_counter()

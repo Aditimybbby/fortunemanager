@@ -1,3 +1,4 @@
+from fortune.legacy_storage import legacy_path
 import json, sys, os
 import discord
 from discord.ext import commands
@@ -6,7 +7,7 @@ import aiosqlite
 import asyncio
 
 async def setup_db():
-  async with aiosqlite.connect('db/prefix.db') as db:
+  async with aiosqlite.connect(legacy_path('prefix.db')) as db:
     await db.execute('''
       CREATE TABLE IF NOT EXISTS prefixes (
         guild_id INTEGER PRIMARY KEY,
@@ -19,7 +20,7 @@ async def setup_db():
 
 
 async def is_topcheck_enabled(guild_id: int):
-    async with aiosqlite.connect('db/topcheck.db') as db:
+    async with aiosqlite.connect(legacy_path('topcheck.db')) as db:
         async with db.execute("SELECT enabled FROM topcheck WHERE guild_id = ?", (guild_id,)) as cursor:
             row = await cursor.fetchone()
             return row is not None and row[0] == 1
@@ -75,7 +76,7 @@ def updateignore(guild_id, data):
 
 
 async def getConfig(guildID):
-  async with aiosqlite.connect('db/prefix.db') as db:
+  async with aiosqlite.connect(legacy_path('prefix.db')) as db:
     async with db.execute("SELECT prefix FROM prefixes WHERE guild_id = ?", (guildID,)) as cursor:
       row = await cursor.fetchone()
       if row:
@@ -86,7 +87,7 @@ async def getConfig(guildID):
         return defaultConfig
 
 async def updateConfig(guildID, data):
-  async with aiosqlite.connect('db/prefix.db') as db:
+  async with aiosqlite.connect(legacy_path('prefix.db')) as db:
     await db.execute(
       "INSERT OR REPLACE INTO prefixes (guild_id, prefix) VALUES (?, ?)",
       (guildID, data["prefix"])
@@ -103,7 +104,7 @@ def restart_program():
 def blacklist_check():
 
   async def predicate(ctx):
-    async with aiosqlite.connect('db/block.db') as db:
+    async with aiosqlite.connect(legacy_path('block.db')) as db:
       cursor = await db.execute("SELECT 1 FROM user_blacklist WHERE user_id = ?", (str(ctx.author.id),))
       user_blacklisted = await cursor.fetchone()
       if user_blacklisted:
@@ -120,7 +121,7 @@ def blacklist_check():
     
 
 async def get_ignore_data(guild_id: int) -> dict:
-    async with aiosqlite.connect("db/ignore.db") as db:
+    async with aiosqlite.connect(legacy_path('ignore.db')) as db:
         data = {
             "channel": set(),
             "user": set(),

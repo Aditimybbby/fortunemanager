@@ -66,7 +66,7 @@ class HelpCommand(commands.HelpCommand):
         color=discord.Color.red()
     )
     embed.set_thumbnail(url="https://cdn.discordapp.com/emojis/1275364856631005256.png")
-    embed.set_author(name="Command Not Found", icon_url=self.context.bot.user.avatar.url)
+    embed.set_author(name="Command Not Found", icon_url=self.context.bot.user.display_avatar.url)
     embed.set_footer(text=f"Requested By {ctx.author}",
                        icon_url=ctx.author.avatar.url if ctx.author.avatar else ctx.author.default_avatar.url)
     if matches:

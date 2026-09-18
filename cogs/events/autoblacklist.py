@@ -1,3 +1,4 @@
+from fortune.legacy_storage import legacy_path
 import discord
 from core import FortuneManager, Cog
 from discord.ext import commands
@@ -12,7 +13,7 @@ class AutoBlacklist(Cog):
         self.last_spam = {}
         self.spam_threshold = 5
         self.spam_window = timedelta(minutes=10)
-        self.db_path = 'db/block.db'
+        self.db_path = legacy_path('block.db')
         self.bot_user_id = self.client.user.id if self.client.user else None
         self.guild_command_tracking = {}  
 

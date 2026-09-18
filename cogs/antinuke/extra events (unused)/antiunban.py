@@ -1,3 +1,4 @@
+from fortune.legacy_storage import legacy_path
 import discord
 from discord.ext import commands
 import aiosqlite
@@ -26,7 +27,7 @@ class AntiUnban(commands.Cog):
 
     @commands.Cog.listener()
     async def on_member_unban(self, guild, user):
-        async with aiosqlite.connect('db/anti.db') as db:
+        async with aiosqlite.connect(legacy_path('anti.db')) as db:
             async with db.execute("SELECT status FROM antinuke WHERE guild_id = ?", (guild.id,)) as cursor:
                 antinuke_status = await cursor.fetchone()
 

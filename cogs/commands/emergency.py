@@ -1,3 +1,4 @@
+from fortune.legacy_storage import legacy_path
 import discord
 from discord.ext import commands
 import aiosqlite
@@ -31,8 +32,11 @@ class Emergency(commands.Cog):
 
     def __init__(self, bot):
         self.bot = bot
-        self.db_path = "db/emergency.db"
-        self.bot.loop.create_task(self.initialize_database())
+        self.db_path = legacy_path('emergency.db')
+
+    async def cog_load(self):
+        await self.initialize_database()
+
 
     async def initialize_database(self):
         async with aiosqlite.connect(self.db_path) as db:
@@ -92,7 +96,7 @@ class Emergency(commands.Cog):
         embed.add_field(name=f"`{ctx.prefix}emergency authorise`", value="> Manage authorized users for executing `emergencysituation` command.", inline=False)
         embed.add_field(name=f"`{ctx.prefix}emergency role`", value="> Manage roles added to the emergency list. You can add/remove/list roles by emergency role group.", inline=False)
         embed.add_field(name=f"`{ctx.prefix}emergency-situation` or `{ctx.prefix}emgs`", value="> Execute emergency situation which disables dangerous permissions from roles in the emergency list & move the role with maximum member to top position below the bot top role. Restore disabled permissions of role using `emgrestore`.", inline=False)
-        embed.set_footer(text="Use \"help emergency <subcommand>\" for more information.", icon_url=self.bot.user.avatar.url)
+        embed.set_footer(text="Use \"help emergency <subcommand>\" for more information.", icon_url=self.bot.user.display_avatar.url)
         await ctx.reply(embed=embed)
 
 
@@ -103,7 +107,7 @@ class Emergency(commands.Cog):
     @commands.max_concurrency(1, per=commands.BucketType.default, wait=False)
     @commands.guild_only()
     async def enable(self, ctx):
-        FortuneManager = ['213347081799073793', '677952614390038559']
+        FortuneManager = []
         if ctx.author.id != ctx.guild.owner_id and str(ctx.author.id) not in FortuneManager:
             embed = discord.Embed(title="<:FortuneManager_cross:1227866668152393789> Error", description="Only the server owner can enable emergency mode.", color=0x000000)
             return await ctx.reply(embed=embed)
@@ -147,7 +151,7 @@ class Emergency(commands.Cog):
     @commands.max_concurrency(1, per=commands.BucketType.default, wait=False)
     @commands.guild_only()
     async def disable(self, ctx):
-        FortuneManager = ['213347081799073793', '677952614390038559']
+        FortuneManager = []
         if ctx.author.id != ctx.guild.owner_id and str(ctx.author.id) not in FortuneManager:
             embed = discord.Embed(title="<:FortuneManager_cross:1227866668152393789> Error", description="Only the server owner can disable emergency mode.", color=0x000000)
             return await ctx.reply(embed=embed)
@@ -237,7 +241,7 @@ class Emergency(commands.Cog):
             return await ctx.reply(embed=embed)
 
         
-        async with aiosqlite.connect('db/emergency.db') as db:
+        async with aiosqlite.connect(legacy_path('emergency.db')) as db:
             cursor = await db.execute("SELECT user_id FROM authorised_users WHERE guild_id = ?", (ctx.guild.id,))
             authorized_users = await cursor.fetchall()
             
@@ -330,7 +334,7 @@ class Emergency(commands.Cog):
             return await ctx.reply(embed=embed)
 
         
-        async with aiosqlite.connect('db/emergency.db') as db:
+        async with aiosqlite.connect(legacy_path('emergency.db')) as db:
             cursor = await db.execute("SELECT role_id FROM emergency_roles WHERE guild_id = ?", (ctx.guild.id,))
             roles = await cursor.fetchall()
 
@@ -358,7 +362,7 @@ class Emergency(commands.Cog):
     @commands.guild_only()
     @commands.bot_has_permissions(manage_roles=True)
     async def emergencysituation(self, ctx):
-        FortuneManager = ['213347081799073793', '677952614390038559']
+        FortuneManager = []
         guild_id = ctx.guild.id
 
         if not await self.is_guild_owner_or_authorised(ctx) and str(ctx.author.id) not in FortuneManager:
@@ -370,7 +374,7 @@ class Emergency(commands.Cog):
         processing_message = await ctx.send(embed=discord.Embed(title="<a:loading:1205135543071940639> Processing Emergency Situation, wait for a while...", color=0x000000))
 
         antinuke_enabled = False
-        async with aiosqlite.connect('db/anti.db') as anti:
+        async with aiosqlite.connect(legacy_path('anti.db')) as anti:
             async with anti.execute("SELECT status FROM antinuke WHERE guild_id = ?", (guild_id,)) as cursor:
                 antinuke_status = await cursor.fetchone()
             if antinuke_status:
@@ -480,7 +484,7 @@ class Emergency(commands.Cog):
                 color=0x000000))
 
         if antinuke_enabled:
-            async with aiosqlite.connect('db/anti.db') as anti:
+            async with aiosqlite.connect(legacy_path('anti.db')) as anti:
                 await anti.execute("INSERT INTO antinuke (guild_id, status) VALUES (?, 1)", (guild_id,))
                 await anti.commit()
 
@@ -495,7 +499,7 @@ class Emergency(commands.Cog):
     @commands.guild_only()
     @commands.bot_has_permissions(manage_roles=True)
     async def emergencyrestore(self, ctx):
-        FortuneManager = ['213347081799073793', '677952614390038559']
+        FortuneManager = []
         if ctx.author.id != ctx.guild.owner_id and str(ctx.author.id) not in FortuneManager:
             return await ctx.reply(embed=discord.Embed(
                 title="<:Denied:1294218790082711553> Access Denied", 

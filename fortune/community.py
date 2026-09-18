@@ -151,42 +151,15 @@ class Community(commands.Cog):
         await ctx.send(embed=embed("Pong", f"{round(self.bot.latency * 1000)} ms"))
 
     @commands.command()
-    async def help(self, ctx, *, command: str = None):
-        if command:
-            cmd = self.bot.get_command(command)
-            if not cmd:
-                return await ctx.send(
-                    embed=embed(
-                        "Command not found", "Use `help` to view the main commands."
-                    )
-                )
-            return await ctx.send(
-                embed=embed(
-                    f"{ctx.clean_prefix}{cmd.qualified_name} {cmd.signature}",
-                    cmd.help or "No additional description.",
-                )
-            )
-        e = embed(
-            "FortuneManager",
-            "Server management, made simple.\nUse `help <command>` for arguments.",
-        )
-        for name, value in [
-            (
-                "Staff",
-                "staff @member · staff list · staff remove @member · staffrole @role",
-            ),
-            (
-                "Moderation",
-                "kick · ban · unban · mute · unmute · timeout · warn · warnings · purge · nickname",
-            ),
-            ("Channels", "lock · unlock · deletechannel · slowmode"),
-            (
-                "Tickets",
-                "ticket setup · ticket panel · ticket add · ticket remove\nClaim, close, transcript, reopen, and delete buttons inside tickets.",
-            ),
-            ("Tracking", "invites @member · messages @member · leaderboard invites/messages · trackingstatus"),
-            ("Events", "event · event end · event owners · eventticket · check · proof <title> + image\nStaff: eventrule · eventunflag · eventreview"),
-            ("Server setup", "dashboard · prefix · greettest · ping"),
-        ]:
-            e.add_field(name=name, value=value, inline=False)
-        await ctx.send(embed=e)
+    @commands.guild_only()
+    @commands.has_guild_permissions(manage_guild=True)
+    async def modulestatus(self, ctx):
+        """Show which Olympus modules loaded and which need attention."""
+        status = embed('Module status', f'Loaded commands: **{len(list(self.bot.walk_commands()))}**\n'
+                       f'Olympus modules loaded: **{len(self.bot.legacy_loaded)}**')
+        status.add_field(name='Failed modules', value=', '.join(self.bot.legacy_failures) or 'None', inline=False)
+        if self.bot.legacy_failures:
+            status.add_field(name='Next step', value='Install requirements.txt, check the startup log, and restart. LEGACY_COGS=all enables the full server feature set.', inline=False)
+        elif not self.bot.legacy_loaded:
+            status.add_field(name='Original modules disabled', value='Set LEGACY_COGS=all and restart.', inline=False)
+        await ctx.send(embed=status)

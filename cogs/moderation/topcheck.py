@@ -1,3 +1,4 @@
+from fortune.legacy_storage import legacy_path
 import discord
 from discord.ext import commands
 import aiosqlite
@@ -6,8 +7,11 @@ import asyncio
 class TopCheck(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
-        self.db_path = "db/topcheck.db"
-        self.bot.loop.create_task(self.setup())
+        self.db_path = legacy_path('topcheck.db')
+
+    async def cog_load(self):
+        await self.setup()
+
 
     async def setup(self):
         async with aiosqlite.connect(self.db_path) as db:

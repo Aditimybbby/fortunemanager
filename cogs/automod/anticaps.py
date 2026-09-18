@@ -1,3 +1,4 @@
+from fortune.legacy_storage import legacy_path
 import discord
 from discord.ext import commands
 import aiosqlite
@@ -11,35 +12,35 @@ class AntiCaps(commands.Cog):
         self.mute_duration = 2 * 60
 
     async def is_automod_enabled(self, guild_id):
-        async with aiosqlite.connect("db/automod.db") as db:
+        async with aiosqlite.connect(legacy_path('automod.db')) as db:
             cursor = await db.execute("SELECT enabled FROM automod WHERE guild_id = ?", (guild_id,))
             result = await cursor.fetchone()
             return result is not None and result[0] == 1
 
     async def is_anti_caps_enabled(self, guild_id):
-        async with aiosqlite.connect("db/automod.db") as db:
+        async with aiosqlite.connect(legacy_path('automod.db')) as db:
             cursor = await db.execute("SELECT punishment FROM automod_punishments WHERE guild_id = ? AND event = 'Anti caps'", (guild_id,))
             result = await cursor.fetchone()
             return result is not None
 
     async def get_ignored_channels(self, guild_id):
-        async with aiosqlite.connect("db/automod.db") as db:
+        async with aiosqlite.connect(legacy_path('automod.db')) as db:
             cursor = await db.execute("SELECT id FROM automod_ignored WHERE guild_id = ? AND type = 'channel'", (guild_id,))
             return [row[0] for row in await cursor.fetchall()]
 
     async def get_ignored_roles(self, guild_id):
-        async with aiosqlite.connect("db/automod.db") as db:
+        async with aiosqlite.connect(legacy_path('automod.db')) as db:
             cursor = await db.execute("SELECT id FROM automod_ignored WHERE guild_id = ? AND type = 'role'", (guild_id,))
             return [row[0] for row in await cursor.fetchall()]
 
     async def get_punishment(self, guild_id):
-        async with aiosqlite.connect("db/automod.db") as db:
+        async with aiosqlite.connect(legacy_path('automod.db')) as db:
             cursor = await db.execute("SELECT punishment FROM automod_punishments WHERE guild_id = ? AND event = 'Anti caps'", (guild_id,))
             result = await cursor.fetchone()
             return result[0] if result else None
 
     async def log_action(self, guild, user, channel, action, reason):
-        async with aiosqlite.connect("db/automod.db") as db:
+        async with aiosqlite.connect(legacy_path('automod.db')) as db:
             cursor = await db.execute("SELECT log_channel FROM automod_logging WHERE guild_id = ?", (guild.id,))
             log_channel_id = await cursor.fetchone()
 
@@ -109,7 +110,7 @@ class AntiCaps(commands.Cog):
                     simple_embed = discord.Embed(title="Automod Anti-Caps", color=0xff0000)
                     simple_embed.description = f"<:FortuneManager_tick:1227866641027698792> | {user.mention} has been successfully **{action_taken}** for **Excessive caps.**"
                     simple_embed.set_thumbnail(url="https://cdn.discordapp.com/emojis/1294125691587006525.png")
-                    simple_embed.set_footer(text="Use the “automod logging” command to get automod logs if it is not enabled.", icon_url=self.bot.user.avatar.url)
+                    simple_embed.set_footer(text="Use the “automod logging” command to get automod logs if it is not enabled.", icon_url=self.bot.user.display_avatar.url)
                     await channel.send(embed=simple_embed, delete_after=30)
 
                     await self.log_action(guild, user, channel, action_taken, reason)

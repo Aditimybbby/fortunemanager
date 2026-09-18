@@ -283,13 +283,14 @@ class MusicControlView(View):
 class Music(commands.Cog):
     def __init__(self, client: FortuneManager):
         self.client = client
-        self.client.loop.create_task(self.connect_nodes())
-        self.client.loop.create_task(self.monitor_inactivity())
+        self.node_task = self.client.loop.create_task(self.connect_nodes())
+        self.monitor_task = self.client.loop.create_task(self.monitor_inactivity())
         
         self.inactivity_timeout = 120 
         self.player_inactivity = {}  
 
     async def monitor_inactivity(self):
+        await self.client.wait_until_ready()
         while True:
             for guild in self.client.guilds:
                 await self.check_inactivity(guild.id) 
@@ -321,7 +322,7 @@ class Music(commands.Cog):
                 await player.disconnect(force=True)
                 try:
                     ended = discord.Embed(description="Bot has been disconnected due to inactivity (being idle in Voice Channel) for more than 2 minutes." , color=0xFF0000)
-                    ended.set_author(name="Inactive Timeout", icon_url=self.client.user.avatar.url)
+                    ended.set_author(name="Inactive Timeout", icon_url=self.client.user.display_avatar.url)
                     ended.set_footer(text="Thanks for choosing FortuneManager!")
                     support = Button(label='Support',
                                  style=discord.ButtonStyle.link,
@@ -409,7 +410,7 @@ class Music(commands.Cog):
             else:
                 await player.disconnect()
                 ended = discord.Embed(description="All tracks have been played, leaving the voice channel." , color=0xFF0000)
-                ended.set_author(name="Queue Ended", icon_url=self.client.user.avatar.url)
+                ended.set_author(name="Queue Ended", icon_url=self.client.user.display_avatar.url)
                 support = Button(label='Support',
                              style=discord.ButtonStyle.link,
                     url=f'https://discord.gg/fortuneleaf')

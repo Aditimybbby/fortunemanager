@@ -6,6 +6,7 @@ import discord
 from discord.ext import commands
 from .branding import embed
 from .store import now
+from .event_rules import invite_window
 
 log = logging.getLogger(__name__)
 SCHEMA = '''
@@ -155,9 +156,17 @@ class Tracking(commands.Cog):
           SUM(EXISTS(SELECT 1 FROM member_movements m WHERE m.guild_id=i.guild_id AND m.member_id=i.member_id AND kind='leave')) AS left,
           SUM(EXISTS(SELECT 1 FROM member_movements m WHERE m.guild_id=i.guild_id AND m.member_id=i.member_id AND kind='rejoin')) AS rejoined
           FROM invite_members i WHERE guild_id=? AND inviter_id=? AND source='invite' ''', (ctx.guild.id,member.id))
-        # Public checking is recorded for staff, who can distinguish Cmds from prohibited chat.
+        event_summary = ''
+        event = await events.active(ctx.guild.id) if events else None
+        if event:
+            claim = await self.bot.store.one('SELECT cutoff FROM event_claims WHERE event_id=? AND user_id=?', (event['id'],member.id))
+            cutoff = claim['cutoff'] if claim else now()
+            verified = await self.bot.store.rows("SELECT * FROM invite_members WHERE guild_id=? AND inviter_id=? AND source='invite'", (ctx.guild.id,member.id))
+            counted, excluded = invite_window(verified,event['started_at'],cutoff)
+            event_summary = (f'\nThis event, before {"ticket" if claim else "now"}: **{len(counted)}** before rule deductions.\n'
+                             f'Before event: **{excluded["before_event"]}**; after cutoff: **{excluded["after_cutoff"]}**.\n')
         await ctx.send(embed=embed(f'Invites · {member.display_name}',
-            f'Verified joins: **{row["total"]}**\nEver left: **{row["left"] or 0}**\nRejoined: **{row["rejoined"] or 0}**\nEvent eligibility is calculated inside your event ticket with `.check`.\nUnattributed and vanity joins are excluded.'))
+            f'All-time verified joins: **{row["total"]}**\nEver left: **{row["left"] or 0}**\nRejoined: **{row["rejoined"] or 0}**\n{event_summary}Event eligibility is calculated inside your event ticket with `.check`.\nUnattributed and vanity joins are excluded.'))
 
     @commands.command(aliases=['msgs'])
     @commands.guild_only()

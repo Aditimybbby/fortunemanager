@@ -1,3 +1,4 @@
+from fortune.legacy_storage import legacy_path
 import discord
 from discord.ext import commands
 import aiosqlite
@@ -31,7 +32,7 @@ class BlacklistWordPaginator:
 
         return pages
 
-DB_PATH = "db/blword.db"
+DB_PATH = legacy_path('blword.db')
 
  
 async def create_blacklist_table():
@@ -75,9 +76,11 @@ async def create_bypass_roles_table():
 class Blacklist(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
-        self.bot.loop.create_task(create_blacklist_table())
-        self.bot.loop.create_task(create_bypass_table())
-        self.bot.loop.create_task(create_bypass_roles_table())
+
+    async def cog_load(self):
+        await create_blacklist_table()
+        await create_bypass_table()
+        await create_bypass_roles_table()
         
 ############ FUNCTIONS ############
     async def is_word_blacklisted(self, guild_id, word):

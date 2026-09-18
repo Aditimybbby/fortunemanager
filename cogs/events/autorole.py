@@ -1,3 +1,4 @@
+from fortune.legacy_storage import legacy_path
 import discord
 import aiohttp
 import aiosqlite
@@ -6,7 +7,7 @@ import logging
 from discord.ext import commands
 from core import FortuneManager, Cog
 
-DATABASE_PATH = 'db/autorole.db'
+DATABASE_PATH = legacy_path('autorole.db')
 logger = logging.getLogger(__name__)
 
 class Autorole2(Cog):

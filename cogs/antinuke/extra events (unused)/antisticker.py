@@ -1,3 +1,4 @@
+from fortune.legacy_storage import legacy_path
 import discord
 from discord.ext import commands
 from datetime import timedelta, datetime
@@ -34,7 +35,7 @@ class AntiSticker(commands.Cog):
         else:
             action = discord.AuditLogAction.sticker_update
 
-        async with aiosqlite.connect('db/anti.db') as db:
+        async with aiosqlite.connect(legacy_path('anti.db')) as db:
             async with db.execute("SELECT status FROM antinuke WHERE guild_id = ?", (guild.id,)) as cursor:
                 antinuke_status = await cursor.fetchone()
 

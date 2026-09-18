@@ -1,3 +1,4 @@
+from fortune.legacy_storage import legacy_path
 import discord
 from discord.ext import commands
 import aiosqlite
@@ -29,7 +30,7 @@ class AntiEmojiDelete(commands.Cog):
     @commands.Cog.listener()
     async def on_guild_emojis_update(self, guild, before, after):
         if len(after) < len(before):
-            async with aiosqlite.connect('db/anti.db') as db:
+            async with aiosqlite.connect(legacy_path('anti.db')) as db:
                 async with db.execute("SELECT status FROM antinuke WHERE guild_id = ?", (guild.id,)) as cursor:
                     antinuke_status = await cursor.fetchone()
 

@@ -23,7 +23,7 @@
 
 No token or Railway account was available during development, so deployment and real Discord delivery have not been performed. The archive is prepared for you to deploy.
 
-Storage remains the existing **SQLite** database at `/data/fortune.db`, using WAL and serialized short transactions. All new tables are additive; existing guild settings, staff, tickets, warnings, and dashboard data remain intact. Back up the mounted directory with a SQLite-aware backup or stop the bot first so the database and WAL are consistent. Archived optional legacy cogs retain their original separate storage behavior; this release extends the actively loaded `fortune/` core.
+Storage remains the existing **SQLite** database at `/data/fortune.db`, using WAL and serialized short transactions. All new tables are additive; existing guild settings, staff, tickets, warnings, and dashboard data remain intact. Back up the mounted directory with a SQLite-aware backup or stop the bot first so the database and WAL are consistent. Restored Olympus modules now keep their separate SQLite files under `/data/legacy`; they load by default. See `FIXES_AND_UPGRADE.md` for migration instructions.
 
 ## Tracking commands
 
@@ -77,6 +77,8 @@ The bot:
 - Shows the ticket owner a reward dropdown containing **all options they qualify for**, with nothing automatically selected.
 - Saves their chosen option, calculates that reward, renames the ticket, and pings configured event owners with a breakdown.
 - Saves the result as **pending staff review**. Approval is one per event/member; repeat checks do not make new reward claims.
+
+`.invites` now distinguishes all-time verified joins from this event's joins. `.check` reports the event start, ticket cutoff, excluded joins, deductions, rounding, and blocking findings. A temporary Discord profile lookup failure reports **Verification pending**. No-rules events do not require profile lookups. Dates are compared as UTC instants, including timestamps with different offsets.
 
 **The member chooses their reward.** The bot never picks the highest tier or substitutes another reward. For example, a member with 10 eligible invites can choose the per-invite cash option, the fixed six-invite cash reward, or Nitro Booster.
 

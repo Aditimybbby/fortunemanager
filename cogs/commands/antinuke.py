@@ -1,3 +1,4 @@
+from fortune.legacy_storage import legacy_path
 import discord
 from discord.ext import commands
 import aiosqlite
@@ -8,10 +9,13 @@ from utils.Tools import *
 class Antinuke(commands.Cog):
   def __init__(self, bot):
     self.bot = bot
-    self.bot.loop.create_task(self.initialize_db())
+
+  async def cog_load(self):
+      await self.initialize_db()
+
 
   async def initialize_db(self):
-    self.db = await aiosqlite.connect('db/anti.db')
+    self.db = await aiosqlite.connect(legacy_path('anti.db'))
     await self.db.execute('''
         CREATE TABLE IF NOT EXISTS antinuke (
             guild_id INTEGER PRIMARY KEY,
@@ -73,7 +77,7 @@ class Antinuke(commands.Cog):
       embed.add_field(name='__**Antinuke Disable**__', value=f'To Disable Antinuke, Use - `{pre}antinuke disable`')
       
 
-      embed.set_thumbnail(url=self.bot.user.avatar.url)
+      embed.set_thumbnail(url=self.bot.user.display_avatar.url)
       await ctx.send(embed=embed)
 
     elif option.lower() == 'enable':
@@ -82,7 +86,7 @@ class Antinuke(commands.Cog):
           description=f'**Security Settings For {ctx.guild.name}**\nYour server __**already has Antinuke enabled.**__\n\nCurrent Status: <:enabled:1204107832232775730> Enabled\nTo Disable use `antinuke disable`',
           color=0x000000
         )
-        embed.set_thumbnail(url=self.bot.user.avatar.url)
+        embed.set_thumbnail(url=self.bot.user.display_avatar.url)
         await ctx.send(embed=embed)
       else:
         
@@ -161,10 +165,10 @@ class Antinuke(commands.Cog):
 
         embed.add_field(name='', value="<:enabled:1261288656690348056> **Anti Prune**\n<:enabled:1261288656690348056> **Auto Recovery**")
 
-        embed.set_author(name="FortuneManager Antinuke", icon_url=self.bot.user.avatar.url)
+        embed.set_author(name="FortuneManager Antinuke", icon_url=self.bot.user.display_avatar.url)
 
-        embed.set_footer(text="Successfully Enabled Antinuke for this server | Powered by FortuneManager Development™", icon_url=self.bot.user.avatar.url)
-        embed.set_thumbnail(url=self.bot.user.avatar.url)
+        embed.set_footer(text="Successfully Enabled Antinuke for this server | Powered by FortuneManager Development™", icon_url=self.bot.user.display_avatar.url)
+        embed.set_thumbnail(url=self.bot.user.display_avatar.url)
 
         view = discord.ui.View()
         view.add_item(discord.ui.Button(label="Show Punishment Type", custom_id="show_punishment"))
@@ -177,7 +181,7 @@ class Antinuke(commands.Cog):
           description=f'**Security Settings For {ctx.guild.name}**\nUhh, looks like your server hasn\'t enabled Antinuke.\n\nCurrent Status: <:disabled:1204107662392827904> Disabled\n\nTo Enable use `antinuke enable`',
           color=0x000000
         )
-        embed.set_thumbnail(url=self.bot.user.avatar.url)
+        embed.set_thumbnail(url=self.bot.user.display_avatar.url)
       else:
         await self.db.execute('DELETE FROM antinuke WHERE guild_id = ?', (guild_id,))
         await self.db.commit()
@@ -185,7 +189,7 @@ class Antinuke(commands.Cog):
           description=f'**Security Settings For {ctx.guild.name}**\nSuccessfully disabled Antinuke for this server.\n\nCurrent Status: <:disabled:1204107662392827904> Disabled\n\nTo Enable use `antinuke enable`',
           color=0x000000
         )
-        embed.set_thumbnail(url=self.bot.user.avatar.url)
+        embed.set_thumbnail(url=self.bot.user.display_avatar.url)
       await ctx.send(embed=embed)
     else:
       embed = discord.Embed(
@@ -218,7 +222,7 @@ class Antinuke(commands.Cog):
         ),
         color=0x000000
       )
-      embed.set_footer(text="These punishment types are fixed and assigned as required to ensure guild security/protection", icon_url=self.bot.user.avatar.url)
+      embed.set_footer(text="These punishment types are fixed and assigned as required to ensure guild security/protection", icon_url=self.bot.user.display_avatar.url)
       await interaction.response.send_message(embed=embed, ephemeral=True)
 
 """

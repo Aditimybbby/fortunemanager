@@ -1,3 +1,4 @@
+from fortune.legacy_storage import legacy_path
 import discord
 from discord.ext import commands
 import aiosqlite
@@ -7,12 +8,15 @@ from utils.Tools import *
 class Whitelist(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
-        self.bot.loop.create_task(self.initialize_db())
+
+    async def cog_load(self):
+        await self.initialize_db()
+
 
     
     #@commands.Cog.listener()
     async def initialize_db(self):
-        self.db = await aiosqlite.connect('db/anti.db')
+        self.db = await aiosqlite.connect(legacy_path('anti.db'))
         await self.db.execute('''
             CREATE TABLE IF NOT EXISTS whitelisted_users (
                 guild_id INTEGER,
@@ -86,7 +90,7 @@ class Whitelist(commands.Cog):
                     f"To enable use `{prefix}antinuke enable` **"
                 )
             )
-            embed.set_thumbnail(url=ctx.bot.user.avatar.url)
+            embed.set_thumbnail(url=ctx.bot.user.display_avatar.url)
             return await ctx.send(embed=embed)
 
         if not member:
@@ -96,7 +100,7 @@ class Whitelist(commands.Cog):
                 description="**Adding a user to the whitelist means that no actions will be taken against them if they trigger the Anti-Nuke Module.**"
             )
             embed.add_field(name="__**Usage**__", value=f"<:red_dot:1222796144996777995> `{prefix}whitelist @user/id`\n<:red_dot:1222796144996777995> `{prefix}wl @user`")
-            embed.set_thumbnail(url=ctx.bot.user.avatar.url)
+            embed.set_thumbnail(url=ctx.bot.user.display_avatar.url)
             return await ctx.send(embed=embed)
 
         async with self.db.execute(
@@ -165,7 +169,7 @@ class Whitelist(commands.Cog):
         )
         embed.add_field(name="**Executor**", value=f"<@!{ctx.author.id}>", inline=True)
         embed.add_field(name="**Target**", value=f"<@!{member.id}>", inline=True)
-        embed.set_thumbnail(url=self.bot.user.avatar.url)
+        embed.set_thumbnail(url=self.bot.user.display_avatar.url)
         embed.set_footer(text=f"Developed by FortuneManager Development™")
 
         msg = await ctx.send(embed=embed, view=view)
@@ -207,7 +211,7 @@ class Whitelist(commands.Cog):
                 )
                 embed.add_field(name="**Executor**", value=f"<@!{ctx.author.id}>", inline=True)
                 embed.add_field(name="**Target**", value=f"<@!{member.id}>", inline=True)
-                embed.set_thumbnail(url=self.bot.user.avatar.url)
+                embed.set_thumbnail(url=self.bot.user.display_avatar.url)
                 embed.set_footer(text=f"Developed by FortuneManager Development™")
 
                 await interaction.response.edit_message(embed=embed, view=None)
@@ -251,7 +255,7 @@ class Whitelist(commands.Cog):
                 )
                 embed.add_field(name="**Executor**", value=f"<@!{ctx.author.id}>", inline=True)
                 embed.add_field(name="**Target**", value=f"<@!{member.id}>", inline=True)
-                embed.set_thumbnail(url=self.bot.user.avatar.url)
+                embed.set_thumbnail(url=self.bot.user.display_avatar.url)
                 embed.set_footer(text=f"Developed by FortuneManager Development™")
 
                 await interaction.response.edit_message(embed=embed, view=None)

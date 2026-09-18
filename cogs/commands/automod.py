@@ -1,3 +1,4 @@
+from fortune.legacy_storage import legacy_path
 import discord
 from discord.ext import commands
 import aiosqlite
@@ -60,10 +61,13 @@ class Automod(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
         self.default_punishment = "Mute"
-        self.bot.loop.create_task(self.init_db())
+
+    async def cog_load(self):
+        await self.init_db()
+
 
     async def get_exempt_roles_channels(self, guild_id):
-        async with aiosqlite.connect("db/automod.db") as db:
+        async with aiosqlite.connect(legacy_path('automod.db')) as db:
             roles_cursor = await db.execute("SELECT id FROM automod_ignored WHERE guild_id = ? AND type = 'role'", (guild_id,))
             channels_cursor = await db.execute("SELECT id FROM automod_ignored WHERE guild_id = ? AND type = 'channel'", (guild_id,))
             
@@ -74,18 +78,18 @@ class Automod(commands.Cog):
             
 
     async def is_automod_enabled(self, guild_id):
-        async with aiosqlite.connect("db/automod.db") as db:
+        async with aiosqlite.connect(legacy_path('automod.db')) as db:
             cursor = await db.execute("SELECT enabled FROM automod WHERE guild_id = ?", (guild_id,))
             result = await cursor.fetchone()
             return result is not None and result[0] == 1
 
     async def update_punishments(self, guild_id, event, punishment):
-        async with aiosqlite.connect("db/automod.db") as db:
+        async with aiosqlite.connect(legacy_path('automod.db')) as db:
             await db.execute("INSERT OR REPLACE INTO automod_punishments (guild_id, event, punishment) VALUES (?, ?, ?)", (guild_id, event, punishment))
             await db.commit()
 
     async def get_current_punishments(self, guild_id):
-        async with aiosqlite.connect("db/automod.db") as db:
+        async with aiosqlite.connect(legacy_path('automod.db')) as db:
             async with db.execute(
                 "SELECT event, punishment FROM automod_punishments WHERE guild_id = ? AND event != 'Anti NSFW link'", 
                 (guild_id,)
@@ -93,7 +97,7 @@ class Automod(commands.Cog):
                 return await cursor.fetchall()
 
     async def is_anti_nsfw_enabled(self, guild_id):
-        async with aiosqlite.connect("db/automod.db") as db:
+        async with aiosqlite.connect(legacy_path('automod.db')) as db:
             cursor = await db.execute("SELECT punishment FROM automod_punishments WHERE guild_id = ? AND event = 'Anti NSFW link'", (guild_id,))
             result = await cursor.fetchone()
             return result is not None
@@ -101,7 +105,7 @@ class Automod(commands.Cog):
                 
 
     async def init_db(self):
-        async with aiosqlite.connect("db/automod.db") as db:
+        async with aiosqlite.connect(legacy_path('automod.db')) as db:
             await db.execute("""
                 CREATE TABLE IF NOT EXISTS automod (
                     guild_id INTEGER PRIMARY KEY,
@@ -161,7 +165,7 @@ class Automod(commands.Cog):
             
         if await self.is_automod_enabled(guild_id):
             embed=discord.Embed(title=f"Automod Settings for {ctx.guild.name}", description=f"**<:Denied:1294218790082711553> Your Server already has Automoderation Enabled.**\n\nCurrent Status: <:enabled:1204107832232775730> Enabled\nTo Disable use `{ctx.prefix}automod disable`", color=0x000000)
-            embed.set_thumbnail(url=self.bot.user.avatar.url)
+            embed.set_thumbnail(url=self.bot.user.display_avatar.url)
             embed.set_footer(text=f"“{ctx.command.qualified_name}” Command executed by {ctx.author}",
                    icon_url=ctx.author.avatar.url if ctx.author.avatar else ctx.author.default_avatar.url)
             await ctx.send(embed=embed)
@@ -178,7 +182,7 @@ class Automod(commands.Cog):
         ]
 
         embed = discord.Embed(title=f"{ctx.guild.name}'s Automod Setup", color=0x000000)
-        embed.set_thumbnail(url=self.bot.user.avatar.url)
+        embed.set_thumbnail(url=self.bot.user.display_avatar.url)
         embed.description = "\n".join([f"<:antinuke_cross1:1276219010781810799><:antinuke_tick2:1276215848687898785> : {event}" for event in events])
 
         select_menu = discord.ui.Select(placeholder="Select events to enable", min_values=1, max_values=len(events), options=[
@@ -228,7 +232,7 @@ class Automod(commands.Cog):
 
     async def enable_automod(self, ctx, guild_id, selected_events, interaction):
 
-        async with aiosqlite.connect("db/automod.db") as db:
+        async with aiosqlite.connect(legacy_path('automod.db')) as db:
             await db.execute("INSERT OR REPLACE INTO automod (guild_id, enabled) VALUES (?, 1)", (guild_id,))
             for event in selected_events:
                 await db.execute("INSERT OR REPLACE INTO automod_punishments (guild_id, event, punishment) VALUES (?, ?, ?)", (guild_id, event, self.default_punishment))
@@ -288,7 +292,7 @@ class Automod(commands.Cog):
                 log_channel = await interaction.guild.create_text_channel("FortuneManager-automod", overwrites=overwrites)
                 guild_id = interaction.guild.id
 
-                async with aiosqlite.connect("db/automod.db") as db:
+                async with aiosqlite.connect(legacy_path('automod.db')) as db:
                     await db.execute("INSERT OR REPLACE INTO automod_logging (guild_id, log_channel) VALUES (?, ?)", (guild_id, log_channel.id))
                     await db.commit()
 
@@ -327,7 +331,7 @@ class Automod(commands.Cog):
             
         if not await self.is_automod_enabled(guild_id):
             embed=discord.Embed(title=f"Automod Settings for {ctx.guild.name}", description=f"Uhh, looks like your server hasn't enabled Automoderation.\n\nCurrent Status: <:disabled:1204107662392827904> Disabled\nTo Enable use `{ctx.prefix}automod enable`", color=0x000000)
-            embed.set_thumbnail(url=self.bot.user.avatar.url)
+            embed.set_thumbnail(url=self.bot.user.display_avatar.url)
             embed.set_footer(text=f"“{ctx.command.qualified_name}” Command executed by {ctx.author}",
                    icon_url=ctx.author.avatar.url if ctx.author.avatar else ctx.author.default_avatar.url)
             await ctx.send(embed=embed)
@@ -339,8 +343,8 @@ class Automod(commands.Cog):
         for event, punishment in current_punishments:
             punishment_map[event] = punishment or "None"
             embed.add_field(name=event, value=punishment or "None", inline=False)
-            embed.set_footer(text="Keep the default punishment (Mute) to prevent server raids without kicking or banning raiders", icon_url=self.bot.user.avatar.url)
-            embed.set_thumbnail(url=self.bot.user.avatar.url)
+            embed.set_footer(text="Keep the default punishment (Mute) to prevent server raids without kicking or banning raiders", icon_url=self.bot.user.display_avatar.url)
+            embed.set_thumbnail(url=self.bot.user.display_avatar.url)
 
         events = [event for event, _ in current_punishments]
         select = discord.ui.Select(placeholder="Select events to update punishment", options=[
@@ -372,8 +376,8 @@ class Automod(commands.Cog):
                     updated_embed = discord.Embed(title=f"Updated Automod Punishments for {ctx.guild.name}", color=0x000000)
                     for event, punishment in updated_punishments:
                         updated_embed.add_field(name=event, value=punishment or "None", inline=False)
-                        updated_embed.set_footer(text="You can modify the punishments by running the command again.", icon_url=self.bot.user.avatar.url)
-                        updated_embed.set_thumbnail(url=self.bot.user.avatar.url)
+                        updated_embed.set_footer(text="You can modify the punishments by running the command again.", icon_url=self.bot.user.display_avatar.url)
+                        updated_embed.set_thumbnail(url=self.bot.user.display_avatar.url)
 
                     
                     await button_interaction.response.edit_message(embed=updated_embed, view=None)
@@ -413,7 +417,7 @@ class Automod(commands.Cog):
         guild_id = ctx.guild.id
         if ctx.author != ctx.guild.owner and ctx.author.top_role.position < ctx.guild.me.top_role.position:
             embed = discord.Embed(title="<:Denied:1294218790082711553> Access Denied", description="Your top role must be at the **same** position or **higher** than my top role.", color=0x000000)
-            embed.set_thumbnail(url=self.bot.user.avatar.url)
+            embed.set_thumbnail(url=self.bot.user.display_avatar.url)
             embed.set_footer(text=f"“{ctx.command.qualified_name}” Command executed by {ctx.author}",
                        icon_url=ctx.author.avatar.url if ctx.author.avatar else ctx.author.default_avatar.url)
             await ctx.send(embed=embed)
@@ -421,13 +425,13 @@ class Automod(commands.Cog):
 
         if not await self.is_automod_enabled(guild_id):
             embed=discord.Embed(title=f"Automod Settings for {ctx.guild.name}", description=f"Uhh, looks like your server hasn't enabled Automoderation.\n\nCurrent Status: <:disabled:1204107662392827904> Disabled\nTo Enable use `{ctx.prefix}automod enable`", color=0x000000)
-            embed.set_thumbnail(url=self.bot.user.avatar.url)
+            embed.set_thumbnail(url=self.bot.user.display_avatar.url)
             embed.set_footer(text=f"“{ctx.command.qualified_name}” Command executed by {ctx.author}",
                    icon_url=ctx.author.avatar.url if ctx.author.avatar else ctx.author.default_avatar.url)
             await ctx.send(embed=embed)
             return
 
-        async with aiosqlite.connect("db/automod.db") as db:
+        async with aiosqlite.connect(legacy_path('automod.db')) as db:
             cursor = await db.execute("SELECT 1 FROM automod_ignored WHERE guild_id = ? AND type = 'channel' AND id = ?", (guild_id, channel.id))
             if await cursor.fetchone() is not None:
                 embed = discord.Embed(title="__Channel Already Whitelisted!__", description=f"<:Denied:1294218790082711553> The channel {channel.mention} is already in the ignore list.\n\n➜ Use **{ctx.prefix}automod unignore channel {channel.mention}** to remove it.", color=0x000000)
@@ -464,7 +468,7 @@ class Automod(commands.Cog):
 
                     
             success = discord.Embed(title="<:FortuneManager_tick:1227866641027698792> Channel Whitelisted", description=f"The channel {channel.mention} has been added to the ignore list \n\n➜ Use `{ctx.prefix}automod ignore show` to view the ignore list.", color=0x000000)
-            success.set_thumbnail(url=self.bot.user.avatar.url)
+            success.set_thumbnail(url=self.bot.user.display_avatar.url)
             success.set_footer(text=f"“{ctx.command.qualified_name}” Command executed by {ctx.author}",
                    icon_url=ctx.author.avatar.url if ctx.author.avatar else ctx.author.default_avatar.url)
 
@@ -488,13 +492,13 @@ class Automod(commands.Cog):
 
         if not await self.is_automod_enabled(guild_id):
             embed=discord.Embed(title=f"Automod Settings for {ctx.guild.name}", description=f"Uhh, looks like your server hasn't enabled Automoderation.\n\nCurrent Status: <:disabled:1204107662392827904> Disabled\nTo Enable use `{ctx.prefix}automod enable`", color=0x000000)
-            embed.set_thumbnail(url=self.bot.user.avatar.url)
+            embed.set_thumbnail(url=self.bot.user.display_avatar.url)
             embed.set_footer(text=f"“{ctx.command.qualified_name}” Command executed by {ctx.author}",
                    icon_url=ctx.author.avatar.url if ctx.author.avatar else ctx.author.default_avatar.url)
             await ctx.send(embed=embed)
             return
 
-        async with aiosqlite.connect("db/automod.db") as db:
+        async with aiosqlite.connect(legacy_path('automod.db')) as db:
             cursor = await db.execute("SELECT 1 FROM automod_ignored WHERE guild_id = ? AND type = 'role' AND id = ?", (guild_id, role.id))
             
             if await cursor.fetchone() is not None:
@@ -532,7 +536,7 @@ class Automod(commands.Cog):
                     
                     
             success = discord.Embed(title="<:FortuneManager_tick:1227866641027698792> Role Whitelisted", description=f"The role {role.mention} has been added to the ignore list \n\n➜ Use `{ctx.prefix}automod ignore show` to view the ignore list.", color=0x000000)
-            success.set_thumbnail(url=self.bot.user.avatar.url)
+            success.set_thumbnail(url=self.bot.user.display_avatar.url)
             success.set_footer(text=f"“{ctx.command.qualified_name}” Command executed by {ctx.author}",
                    icon_url=ctx.author.avatar.url if ctx.author.avatar else ctx.author.default_avatar.url)
 
@@ -556,14 +560,14 @@ class Automod(commands.Cog):
 
         if not await self.is_automod_enabled(guild_id):
             embed=discord.Embed(title=f"Automod Settings for {ctx.guild.name}", description=f"Uhh, looks like your server hasn't enabled Automoderation.\n\nCurrent Status: <:disabled:1204107662392827904> Disabled\nTo Enable use `{ctx.prefix}automod enable`", color=0x000000)
-            embed.set_thumbnail(url=self.bot.user.avatar.url)
+            embed.set_thumbnail(url=self.bot.user.display_avatar.url)
             embed.set_footer(text=f"“{ctx.command.qualified_name}” Command executed by {ctx.author}",
                    icon_url=ctx.author.avatar.url if ctx.author.avatar else ctx.author.default_avatar.url)
             await ctx.send(embed=embed)
             return
             
 
-        async with aiosqlite.connect("db/automod.db") as db:
+        async with aiosqlite.connect(legacy_path('automod.db')) as db:
             cursor = await db.execute("SELECT type, id FROM automod_ignored WHERE guild_id = ?", (guild_id,))
             ignored_items = await cursor.fetchall()
 
@@ -621,17 +625,17 @@ class Automod(commands.Cog):
 
         if not await self.is_automod_enabled(guild_id):
             embed=discord.Embed(title=f"Automod Settings for {ctx.guild.name}", description=f"Uhh, looks like your server hasn't enabled Automoderation.\n\nCurrent Status: <:disabled:1204107662392827904> Disabled\nTo Enable use `{ctx.prefix}automod enable`", color=0x000000)
-            embed.set_thumbnail(url=self.bot.user.avatar.url)
+            embed.set_thumbnail(url=self.bot.user.display_avatar.url)
             embed.set_footer(text=f"“{ctx.command.qualified_name}” Command executed by {ctx.author}",
                    icon_url=ctx.author.avatar.url if ctx.author.avatar else ctx.author.default_avatar.url)
             await ctx.send(embed=embed)
             return
 
-        async with aiosqlite.connect("db/automod.db") as db:
+        async with aiosqlite.connect(legacy_path('automod.db')) as db:
             await db.execute("DELETE FROM automod_ignored WHERE guild_id = ?", (guild_id,))
             await db.commit()
         embed=discord.Embed(title=f"Automod Settings for {ctx.guild.name}", description=f"** <:FortuneManager_tick:1227866641027698792> | All ignored channels and roles have been reset!**\n\nTo view current Automod settings use `{ctx.prefix}automod config`", color=0x000000)
-        embed.set_thumbnail(url=self.bot.user.avatar.url)
+        embed.set_thumbnail(url=self.bot.user.display_avatar.url)
         embed.set_footer(text=f"“{ctx.command.qualified_name}” Command executed by {ctx.author}",
                icon_url=ctx.author.avatar.url if ctx.author.avatar else ctx.author.default_avatar.url)
         await ctx.send(embed=embed)
@@ -664,7 +668,7 @@ class Automod(commands.Cog):
 
         if not await self.is_automod_enabled(guild_id):
             embed=discord.Embed(title=f"Automod Settings for {ctx.guild.name}", description=f"Uhh, looks like your server hasn't enabled Automoderation.\n\nCurrent Status: <:disabled:1204107662392827904> Disabled\nTo Enable use `{ctx.prefix}automod enable`", color=0x000000)
-            embed.set_thumbnail(url=self.bot.user.avatar.url)
+            embed.set_thumbnail(url=self.bot.user.display_avatar.url)
             embed.set_footer(text=f"“{ctx.command.qualified_name}” Command executed by {ctx.author}",
                    icon_url=ctx.author.avatar.url if ctx.author.avatar else ctx.author.default_avatar.url)
             await ctx.send(embed=embed)
@@ -685,7 +689,7 @@ class Automod(commands.Cog):
             except discord.HTTPException:
                 pass
         
-        async with aiosqlite.connect("db/automod.db") as db:
+        async with aiosqlite.connect(legacy_path('automod.db')) as db:
             result = await db.execute("DELETE FROM automod_ignored WHERE guild_id = ? AND type = 'channel' AND id = ?", (guild_id, channel.id))
             await db.commit()
 
@@ -719,7 +723,7 @@ class Automod(commands.Cog):
 
         if not await self.is_automod_enabled(guild_id):
             embed=discord.Embed(title=f"Automod Settings for {ctx.guild.name}", description=f"Uhh, looks like your server hasn't enabled Automoderation.\n\nCurrent Status: <:disabled:1204107662392827904> Disabled\nTo Enable use `{ctx.prefix}automod enable`", color=0x000000)
-            embed.set_thumbnail(url=self.bot.user.avatar.url)
+            embed.set_thumbnail(url=self.bot.user.display_avatar.url)
             embed.set_footer(text=f"“{ctx.command.qualified_name}” Command executed by {ctx.author}",
                    icon_url=ctx.author.avatar.url if ctx.author.avatar else ctx.author.default_avatar.url)
             await ctx.send(embed=embed)
@@ -741,7 +745,7 @@ class Automod(commands.Cog):
                 pass
 
         
-        async with aiosqlite.connect("db/automod.db") as db:
+        async with aiosqlite.connect(legacy_path('automod.db')) as db:
             result = await db.execute("DELETE FROM automod_ignored WHERE guild_id = ? AND type = 'role' AND id = ?", (guild_id, role.id))
             await db.commit()
 
@@ -775,7 +779,7 @@ class Automod(commands.Cog):
             
         if not await self.is_automod_enabled(guild_id):
             embed=discord.Embed(title=f"Automod Settings for {ctx.guild.name}", description=f"Uhh, looks like your server hasn't enabled Automoderation.\n\nCurrent Status: <:disabled:1204107662392827904> Disabled\nTo Enable use `{ctx.prefix}automod enable`", color=0x000000)
-            embed.set_thumbnail(url=self.bot.user.avatar.url)
+            embed.set_thumbnail(url=self.bot.user.display_avatar.url)
             embed.set_footer(text=f"“{ctx.command.qualified_name}” Command executed by {ctx.author}",
                    icon_url=ctx.author.avatar.url if ctx.author.avatar else ctx.author.default_avatar.url)
             await ctx.send(embed=embed)
@@ -787,7 +791,7 @@ class Automod(commands.Cog):
             color=0x0000000
         )
         embed.set_footer(text="Click 'Yes' to disable Automod or 'No' to cancel.")
-        embed.set_thumbnail(url=self.bot.user.avatar.url)
+        embed.set_thumbnail(url=self.bot.user.display_avatar.url)
 
         view = ConfirmDisable(ctx.author)
         message = await ctx.send(embed=embed, view=view)
@@ -803,7 +807,7 @@ class Automod(commands.Cog):
 
         elif view.value:
             
-            async with aiosqlite.connect("db/automod.db") as db:
+            async with aiosqlite.connect(legacy_path('automod.db')) as db:
                 await db.execute("DELETE FROM automod WHERE guild_id = ?", (guild_id,))
                 await db.execute("DELETE FROM automod_punishments WHERE guild_id = ?", (guild_id,))
                 await db.execute("DELETE FROM automod_ignored WHERE guild_id = ?", (guild_id,))
@@ -824,7 +828,7 @@ class Automod(commands.Cog):
             embed.title = "<:FortuneManager_tick:1227866641027698792> Automod Disabled"
             embed.description = f"Automod has been successfully disabled for **{ctx.guild.name}.** \nAll settings, punishments, and logs have been removed.\n\nCurrent Status:<:disabled:1204107662392827904> Disabled\n➜ To Re-enable use `{ctx.prefix}automod enable`."
             embed.color = 0x000000
-            embed.set_thumbnail(url=self.bot.user.avatar.url)
+            embed.set_thumbnail(url=self.bot.user.display_avatar.url)
             embed.set_footer(text=f"“{ctx.command.qualified_name}” Command executed by {ctx.author}",
                        icon_url=ctx.author.avatar.url if ctx.author.avatar else ctx.author.default_avatar.url)
             await message.edit(embed=embed, view=None)
@@ -858,7 +862,7 @@ class Automod(commands.Cog):
             
         if not await self.is_automod_enabled(guild_id):
             embed=discord.Embed(title=f"Automod Settings for {ctx.guild.name}", description=f"Uhh, looks like your server hasn't enabled Automoderation.\n\nCurrent Status: <:disabled:1204107662392827904> Disabled\nTo Enable use `{ctx.prefix}automod enable`", color=0x000000)
-            embed.set_thumbnail(url=self.bot.user.avatar.url)
+            embed.set_thumbnail(url=self.bot.user.display_avatar.url)
             embed.set_footer(text=f"“{ctx.command.qualified_name}” Command executed by {ctx.author}",
                    icon_url=ctx.author.avatar.url if ctx.author.avatar else ctx.author.default_avatar.url)
             await ctx.send(embed=embed)
@@ -866,12 +870,12 @@ class Automod(commands.Cog):
 
         current_punishments = await self.get_current_punishments(guild_id)
         embed = discord.Embed(title=f"Enabled Automod Events & their punishment type for {ctx.guild.name}", color=0x000000)
-        embed.set_footer(text="Manage punishment type for events by executing “automod punishment” command.", icon_url=self.bot.user.avatar.url)
+        embed.set_footer(text="Manage punishment type for events by executing “automod punishment” command.", icon_url=self.bot.user.display_avatar.url)
 
         if ctx.guild.icon:
             embed.set_thumbnail(url=ctx.guild.icon.url)
         else:
-            embed.set_thumbnail(url=self.bot.user.avatar.url)
+            embed.set_thumbnail(url=self.bot.user.display_avatar.url)
 
         for event, punishment in current_punishments:
             embed.add_field(name=event, value=punishment or "None", inline=False)
@@ -879,7 +883,7 @@ class Automod(commands.Cog):
         if await self.is_anti_nsfw_enabled(guild_id):
             embed.add_field(name="Anti NSFW Links", value="Block Message", inline=False)
 
-        async with aiosqlite.connect("db/automod.db") as db:
+        async with aiosqlite.connect(legacy_path('automod.db')) as db:
             cursor = await db.execute("SELECT log_channel FROM automod_logging WHERE guild_id = ?", (guild_id,))
             log_channel_id = await cursor.fetchone()
 
@@ -912,13 +916,13 @@ class Automod(commands.Cog):
             return
         if not await self.is_automod_enabled(guild_id):
             embed=discord.Embed(title=f"Automod Settings for {ctx.guild.name}", description=f"Uhh, looks like your server hasn't enabled Automoderation.\n\nCurrent Status: <:disabled:1204107662392827904> Disabled\nTo Enable use `{ctx.prefix}automod enable`", color=0x000000)
-            embed.set_thumbnail(url=self.bot.user.avatar.url)
+            embed.set_thumbnail(url=self.bot.user.display_avatar.url)
             embed.set_footer(text=f"“{ctx.command.qualified_name}” Command executed by {ctx.author}",
                    icon_url=ctx.author.avatar.url if ctx.author.avatar else ctx.author.default_avatar.url)
             await ctx.send(embed=embed)
             return
             
-        async with aiosqlite.connect("db/automod.db") as db:
+        async with aiosqlite.connect(legacy_path('automod.db')) as db:
             await db.execute("INSERT OR REPLACE INTO automod_logging (guild_id, log_channel) VALUES (?, ?)", (guild_id, channel.id))
             await db.commit()
             embed=discord.Embed(title=f"Automod Settings for {ctx.guild.name}", description=f"**<:FortuneManager_tick:1227866641027698792> | Automoderation Logging channel set to {channel.mention}.**\n\n➜ Use `{ctx.prefix}automod config` to view current Automod settings.", color=0x000000)
@@ -931,7 +935,7 @@ class Automod(commands.Cog):
     async def on_guild_remove(self, guild):
         guild_id = guild.id
 
-        async with aiosqlite.connect("db/automod.db") as db:
+        async with aiosqlite.connect(legacy_path('automod.db')) as db:
             await db.execute("DELETE FROM automod WHERE guild_id = ?", (guild_id,))
             await db.execute("DELETE FROM automod_punishments WHERE guild_id = ?", (guild_id,))
             await db.execute("DELETE FROM automod_ignored WHERE guild_id = ?", (guild_id,))

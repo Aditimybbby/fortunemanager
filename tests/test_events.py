@@ -346,7 +346,7 @@ async def test_fetch_failure_blocks_reward(setup):
     w.guild.fetch_member.side_effect=discord.HTTPException(NS(status=503,reason='Unavailable'), 'Try again')
     _,_,result=await c.evaluate(w.guild,cl)
     assert result['unavailable']==[77] and result['blocked']
-    assert result['reward']=='No reward'
+    assert result['reward']=='Verification pending'
 
 
 async def test_proof_delivery_failure_not_recorded(setup):
@@ -377,7 +377,7 @@ async def test_reward_picker_offers_all_eligible_options_without_default(setup):
     assert not any(o.default for o in options)
     assert '$3.00' in options[0].label
     assert cl['selected_reward'] is None
-    c.evaluate=AsyncMock(return_value=({},dict(rewards=REWARDS),dict(eligible=10,blocked=[])))
+    c.evaluate=AsyncMock(return_value=({},dict(rewards=REWARDS),dict(eligible=10,blocked=[],raw=10,deductions=[],rounded=0)))
     await c.present_rewards(w.guild,w.channel,cl)
     assert isinstance(w.channel.send.call_args.kwargs['view'],RewardView)
     assert (await bot.store.one('SELECT selected_reward FROM event_claims'))['selected_reward'] is None

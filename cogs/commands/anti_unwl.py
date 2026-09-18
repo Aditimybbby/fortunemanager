@@ -1,3 +1,4 @@
+from fortune.legacy_storage import legacy_path
 import discord
 from discord.ext import commands
 import aiosqlite
@@ -7,11 +8,14 @@ from utils.Tools import *
 class Unwhitelist(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
-        self.bot.loop.create_task(self.initialize_db())
+
+    async def cog_load(self):
+        await self.initialize_db()
+
 
     #@commands.Cog.listener()
     async def initialize_db(self):
-        self.db = await aiosqlite.connect('db/anti.db')
+        self.db = await aiosqlite.connect(legacy_path('anti.db'))
 
     @commands.hybrid_command(name='unwhitelist', aliases=['unwl'], help="Unwhitelist a user from antinuke")
     @commands.has_permissions(administrator=True)

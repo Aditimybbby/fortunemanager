@@ -1,3 +1,4 @@
+from fortune.legacy_storage import legacy_directory
 import discord
 from discord.ext import commands
 import aiosqlite
@@ -5,7 +6,7 @@ import os
 from utils.Tools import *
 
 # Database setup
-db_folder = 'db'
+db_folder = legacy_directory()
 db_file = 'anti.db'
 db_path = os.path.join(db_folder, db_file)
 
@@ -13,9 +14,12 @@ class Nightmode(commands.Cog):
 
     def __init__(self, bot):
         self.bot = bot
-        self.bot.loop.create_task(self.initialize_db())
-        self.ricky = ['1070619070468214824', '1087282349395411015', '858642338980954113']
+        self.ricky = []
         self.color = 0x000000  
+
+    async def cog_load(self):
+        await self.initialize_db()
+
 
     async def initialize_db(self):
         self.db = await aiosqlite.connect(db_path)
@@ -54,7 +58,7 @@ class Nightmode(commands.Cog):
             value="<:red_dot:1222796144996777995> `nightmode enable`\n<:red_dot:1222796144996777995> `nightmode disable`",
             inline=False
         )
-        nightmode_embed.set_thumbnail(url=self.bot.user.avatar.url)
+        nightmode_embed.set_thumbnail(url=self.bot.user.display_avatar.url)
         await ctx.send(embed=nightmode_embed)
 
     @nightmode.command(name="enable", help="Enable nightmode")

@@ -1,3 +1,4 @@
+from fortune.legacy_storage import legacy_path
 import discord
 from discord import app_commands
 from discord.ext import commands
@@ -7,8 +8,8 @@ import asyncio
 from utils.Tools import *
 from typing import List, Tuple
 
-DATABASE_PATH = 'db/customrole.db'
-DATABASE_PATH2 = 'db/np.db'
+DATABASE_PATH = legacy_path('customrole.db')
+DATABASE_PATH2 = legacy_path('np.db')
 
 
 class Customrole(commands.Cog):
@@ -20,7 +21,10 @@ class Customrole(commands.Cog):
         self.rate_limit_timeout = 5
 
 
-        self.bot.loop.create_task(self.create_tables())
+
+    async def cog_load(self):
+        await self.create_tables()
+
 
 
     async def reset_rate_limit(self, user_id):
@@ -61,7 +65,7 @@ class Customrole(commands.Cog):
     
 
     async def handle_role_command(self, context: Context, member: discord.Member, role_type: str):
-        async with aiosqlite.connect('db/customrole.db') as db:
+        async with aiosqlite.connect(legacy_path('customrole.db')) as db:
             async with db.execute(f"SELECT reqrole, {role_type} FROM roles WHERE guild_id = ?", (context.guild.id,)) as cursor:
                 data = await cursor.fetchone()
                 if data:

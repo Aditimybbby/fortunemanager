@@ -1,3 +1,4 @@
+from fortune.legacy_storage import legacy_path
 import discord
 import psutil
 import sys
@@ -19,11 +20,14 @@ class Stats(commands.Cog):
         self.bot = bot
         self.start_time = time.time()
         self.total_songs_played = 0
-        self.bot.loop.create_task(self.setup_database())
+
+    async def cog_load(self):
+        await self.setup_database()
+
 
     
     async def setup_database(self):
-        async with aiosqlite.connect("db/stats.db") as db:
+        async with aiosqlite.connect(legacy_path('stats.db')) as db:
            # await db.execute("CREATE TABLE IF NOT EXISTS stats (key TEXT PRIMARY KEY, value INTEGER)")
            # await db.commit()  
             async with db.execute("SELECT value FROM stats WHERE key = 'total_songs_played'") as cursor:
@@ -31,7 +35,7 @@ class Stats(commands.Cog):
                 self.total_songs_played = row[0] if row else 0
 
     async def update_total_songs_played(self):
-        async with aiosqlite.connect("db/stats.db") as db:
+        async with aiosqlite.connect(legacy_path('stats.db')) as db:
             await db.execute("INSERT OR REPLACE INTO stats (key, value) VALUES ('total_songs_played', ?)", (self.total_songs_played,))
             await db.commit()
 
@@ -149,7 +153,7 @@ class Stats(commands.Cog):
 
                 db_latency = None
                 try:
-                    async with aiosqlite.connect("db/afk.db") as db:
+                    async with aiosqlite.connect(legacy_path('afk.db')) as db:
                         start_time = time.perf_counter()
                         await db.execute("SELECT 1")
                         end_time = time.perf_counter()

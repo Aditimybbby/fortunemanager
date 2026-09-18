@@ -39,6 +39,8 @@ class FortuneManager(commands.Bot):
         self.start_dashboard = start_dashboard
         self.load_legacy = load_legacy
         self.legacy_failures = []
+        self.legacy_errors = {}
+        self.legacy_loaded = []
 
     async def resolve_prefix(self, bot, message):
         prefix = settings.DEFAULT_PREFIX
@@ -63,6 +65,8 @@ class FortuneManager(commands.Bot):
             from .legacy import load
 
             await load(self)
+        from .help import OlympusHelp
+        self.help_command = OlympusHelp()
         if self.start_dashboard and os.getenv("ENABLE_DASHBOARD", "1") == "1":
             from .dashboard import Dashboard
 
@@ -84,7 +88,9 @@ class FortuneManager(commands.Bot):
 
     async def on_command_error(self, ctx, error):
         if isinstance(error, commands.CommandNotFound):
-            return
+            return await ctx.send(embed=embed('Unknown command',
+                f'Use `{ctx.clean_prefix}help` to see the loaded commands. '
+                'If an original module is missing, an administrator can use `modulestatus`.'))
         error = getattr(error, "original", error)
         if isinstance(error, commands.MissingRequiredArgument):
             message = f"Missing `{error.param.name}`. Use `{ctx.clean_prefix}help {ctx.command.qualified_name}`."
@@ -125,8 +131,14 @@ class FortuneManager(commands.Bot):
             await self.dashboard_server.close()
             self.dashboard_server = None
         # Allow old cogs to cancel tasks before the shared HTTP session closes.
+        from .legacy import cleanup
         for name in list(self.cogs):
-            await self.remove_cog(name)
+            cog = self.get_cog(name)
+            try:
+                await self.remove_cog(name)
+            finally:
+                if name in self.legacy_loaded:
+                    await cleanup(cog)
         if self.session and not self.session.closed:
             await self.session.close()
         await super().close()
@@ -135,11 +147,12 @@ class FortuneManager(commands.Bot):
         channel = self.get_channel(channel_id) or await self.fetch_channel(channel_id)
         return await channel.send(content, **kwargs)
 
+    async def get_context(self, origin, /, *, cls=None):
+        from core.Context import Context
+        return await super().get_context(origin, cls=cls or Context)
+
     async def invoke_help_command(self, ctx):
-        return await ctx.invoke(
-            self.get_command("help"),
-            command=ctx.command.qualified_name if ctx.command else None,
-        )
+        return await ctx.send_help(ctx.command)
 
     async def fetch_message_by_channel(self, channel, messageID):
         return await channel.fetch_message(messageID)

@@ -71,6 +71,14 @@ class Context(commands.Context):
             return
         return await super().reply(content, **kwargs)
 
+    async def error(self, message, **kwargs):
+        from fortune.branding import embed
+        return await self.send(embed=embed('Unable to complete that action', message, color=0xEF8999), **kwargs)
+
+    async def success(self, message, **kwargs):
+        from fortune.branding import embed
+        return await self.send(embed=embed('Done', message), **kwargs)
+
     async def release(self, delay: Optional[int] = None) -> None:
         delay = delay or 0
         await asyncio.sleep(delay)

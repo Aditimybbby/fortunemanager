@@ -4,6 +4,10 @@ A Discord server-management bot with a Discord-login dashboard, granular staff g
 
 **Default prefix: `.`. Python 3.12 recommended.** The bot and dashboard run together with `python main.py`. No Node build, Redis, MongoDB, Lavalink, or paid API is required for the rebuilt core.
 
+## Olympus help and rewards repair
+
+This build restores the Olympus category help menu and loads the original server features by default. Read **[FIXES_AND_UPGRADE.md](FIXES_AND_UPGRADE.md)** before updating an existing installation. Use `.help`, `.help antinuke`, and `.modulestatus` after restart.
+
 ## New: Railway, invite events, and tracking
 
 Read **[RAILWAY_AND_EVENTS.md](RAILWAY_AND_EVENTS.md)** for Railway deployment, `.event` setup, reward examples, invite/message tracking, `.check`, `.proof`, and the automatic-versus-manual rule table. SQLite data is preserved on a mounted Railway volume. Existing configured prefixes continue to work; `.` is also always accepted.
@@ -11,7 +15,7 @@ Read **[RAILWAY_AND_EVENTS.md](RAILWAY_AND_EVENTS.md)** for Railway deployment, 
 ## Start here
 
 1. Extract this folder. Install Python 3.12.
-2. Create a virtual environment and install the core dependencies:
+2. Create a virtual environment and install the dependencies:
 
    ```sh
    python -m venv .venv
@@ -24,7 +28,7 @@ Read **[RAILWAY_AND_EVENTS.md](RAILWAY_AND_EVENTS.md)** for Railway deployment, 
 
 3. Copy `.env.example` to `.env`. Set `DISCORD_TOKEN` to **your own bot token**. The older `TOKEN` environment variable is also accepted. Do not share this file.
 4. In the [Discord Developer Portal](https://discord.com/developers/applications), enable **Server Members Intent** and **Message Content Intent** under Bot. The core does not need Presence Intent. Rename your application/bot to **FortuneManager** there if its Discord profile still has the previous name; source-code branding does not change your Discord application profile.
-5. Invite the bot with these permissions: View Channels, Send Messages, Embed Links, Attach Files, Read Message History, Manage Server (for invite tracking), Add Reactions, Kick Members, Ban Members, Moderate Members, Manage Messages, Manage Nicknames, Manage Channels, and Manage Roles. Administrator is not required.
+5. Invite the bot with these permissions: View Channels, Send Messages, Embed Links, Attach Files, Read Message History, Manage Server (for invite tracking), Add Reactions, Kick Members, Ban Members, Moderate Members, Manage Messages, Manage Nicknames, Manage Channels, and Manage Roles. Administrator is not required for the rebuilt core; the original antinuke setup requires it and must be run by the server owner or an assigned extra owner.
 6. Put the bot's role above the staff role and any members/roles it needs to manage.
 7. Run:
 
@@ -177,29 +181,27 @@ Docker is optional:
 docker compose up -d --build
 ```
 
-The Compose example exposes the dashboard only on the host's loopback port 8080, keeps data in a named volume, and expects a TLS reverse proxy for public access. Its image installs core dependencies only.
+The Compose example exposes the dashboard only on the host's loopback port 8080, keeps data in a named volume, and expects a TLS reverse proxy for public access. Its image installs the core and restored Olympus dependencies.
 
-## Retained original features
+## Restored original features
 
-The uploaded feature modules and assets remain in `cogs/`, `games/`, `data/`, `utils/`, and `db/`, with FortuneManager branding. They are **optional and disabled by default**. The new moderation, greetings, staff, tickets, help, and dashboard are the active implementation.
+The server feature modules in `cogs/` load by default alongside the current staff, ticket, tracking, event, and dashboard services. The interactive help menu lists the commands that actually loaded, with categories, page buttons, aliases, usage, and group subcommands. `.h` is an alias for `.help`.
 
-To experiment with retained features:
-
-```sh
-python -m pip install -r requirements-legacy.txt
-```
-
-Then explicitly choose cog class names in `.env`, for example:
+`requirements.txt` includes the Olympus dependencies. `requirements-legacy.txt` remains a compatible alias. In `.env`:
 
 ```dotenv
-LEGACY_COGS=afk,Timer,Slots,Blackjack
+LEGACY_COGS=all
 ```
 
-Available original class names are listed in `fortune/legacy_modules.json`. Each selected module loads separately; a failure is logged without disabling the rebuilt core. Core commands take precedence over conflicting old commands. Superseded moderation/greeting modules and the original owner/global-control modules are not loaded by this bridge.
+An unset or blank value also loads the full supported server feature set. Use `LEGACY_COGS=none` for the smaller core, or a comma-separated list of original class names from `fortune/legacy_modules.json`. Selecting `Antinuke` also loads its whitelist commands and protection listeners; selecting `Automod` loads its enforcement listeners.
 
-Legacy AI/music integrations still require your own valid service credentials/endpoints. Their third-party services and entire legacy command collection have **not** been live-tested or claimed as repaired. They are not configured through the new dashboard. Review an optional feature before enabling it; core staff grants govern the rebuilt command set, not every retained module. Existing old custom emoji IDs may require access to their original emoji servers.
+Core command names take precedence where names overlap. Other original moderation commands are registered under the `OlympusModeration` cog to avoid a cog-name collision. Original global bot-owner controls, the old no-prefix system, duplicate help/error handlers, and hardcoded join advertising remain excluded. Loading protection modules does not turn protection on for new servers; `.antinuke enable` and `.automod` retain their configuration and permission checks. Existing saved module settings are preserved.
 
-This separation removes the original all-or-nothing loader, circular startup imports, hardcoded default owners, invalid dependencies, import-time event-loop startup, forced two-shard setup, and active embedded service credentials from the core startup path. The old source and databases are retained rather than discarded.
+Original feature databases now live in `DATA_DIR/legacy` (on Railway, `/data/legacy`). The first run copies the bundled/existing `db/*.db` using SQLite backup; subsequent starts keep the persisted copy. Set `LEGACY_DATA_DIR` only if a different persistent location is needed. Initialization is awaited before commands become available, and connections/background tasks close on shutdown.
+
+Run `.modulestatus` as a server manager to see load failures. The full help also flags failures; unknown commands return a response. Startup logs contain the detailed exception.
+
+Music/AI and other provider-backed commands still need their service endpoints, credentials, and assets. Provider operations and live Discord actions were not exercised by the offline tests. Original server commands retain their own Discord permission checks; staff grants in the dashboard apply to the rebuilt command set. Legacy greeting/autorole settings are separate from dashboard settings, so configure each feature through one interface to avoid duplicate greetings/role additions. Old custom emoji IDs may depend on access to their original emoji servers.
 
 ## Verification
 
@@ -215,7 +217,7 @@ npm ci --prefix tests/ui
 npm test --prefix tests/ui
 ```
 
-See `TEST_REPORT.md` for the exact checks and limits. These tests use local SQLite databases, mocked Discord objects, and mocked HTTP/OAuth responses. A successful test run is not a claim of a live Discord deployment.
+See `FIXES_AND_UPGRADE.md` for the current checks and limits; `TEST_REPORT.md` and `UPDATE_TEST_REPORT.md` describe earlier builds. These tests use local SQLite databases, mocked Discord objects, and mocked HTTP/OAuth responses. A successful test run is not a claim of a live Discord deployment.
 
 Suggested live acceptance check after setup: save a staff member with only Kick, verify Ban is denied, remove the grant, publish a ticket panel, open/claim/close/reopen a ticket, restart the bot and reuse the old panel, test a welcome, send an embed, and add/remove a reaction role.
 
@@ -228,7 +230,7 @@ Suggested live acceptance check after setup: save a staff member with only Kick,
 - **Dashboard shows no server:** your account needs Manage Server or Administrator, and the bot needs to be invited to that server.
 - **A button shows an error:** check the console and channel permissions. Existing ticket controls recover on restart; a temporary staff selector expires after five minutes and should be reopened.
 - **Artwork stops loading:** replace the signed attachment links with durable image URLs.
-- **Optional legacy module fails:** its failure is shown in the console. Disable that cog or configure its additional dependency/provider; it does not block core startup.
+- **Original module missing:** run `.modulestatus`, install `requirements.txt`, set `LEGACY_COGS=all`, and restart. Review the startup log if a module still fails.
 
 ## Implementation references
 

@@ -1,4 +1,5 @@
 from __future__ import annotations
+from fortune.legacy_storage import legacy_path
 import discord
 from discord.ext import commands
 from core import *
@@ -9,9 +10,12 @@ import aiosqlite
 class Ignore(commands.Cog):
   def __init__(self, bot):
     self.bot = bot
-    self.db_path = "db/ignore.db"
+    self.db_path = legacy_path('ignore.db')
     self.color = 0x000000
-    bot.loop.create_task(self.initialize_db())
+
+  async def cog_load(self):
+      await self.initialize_db()
+
 
   async def initialize_db(self):
     async with aiosqlite.connect(self.db_path) as db:

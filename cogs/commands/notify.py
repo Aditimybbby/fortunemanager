@@ -1,3 +1,4 @@
+from fortune.legacy_storage import legacy_path
 import discord
 from discord.ext import commands
 import aiosqlite
@@ -6,8 +7,11 @@ from utils.Tools import *
 class NotifCommands(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
-        self.db_path = "db/notify.db"
-        self.loop_task = self.bot.loop.create_task(self.setup_db())
+        self.db_path = legacy_path('notify.db')
+
+    async def cog_load(self):
+        await self.setup_db()
+
 
     async def setup_db(self):
         async with aiosqlite.connect(self.db_path) as db:

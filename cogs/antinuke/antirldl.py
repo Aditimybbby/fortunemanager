@@ -1,3 +1,4 @@
+from fortune.legacy_storage import legacy_path
 import discord
 from discord.ext import commands
 import aiosqlite
@@ -12,7 +13,7 @@ class AntiRoleDelete(commands.Cog):
         self.cooldowns = {}
 
     async def is_blacklisted_guild(self, guild_id):
-        async with aiosqlite.connect('db/block.db') as block_db:
+        async with aiosqlite.connect(legacy_path('block.db')) as block_db:
             cursor = await block_db.execute("SELECT 1 FROM guild_blacklist WHERE guild_id = ?", (str(guild_id),))
             return await cursor.fetchone() is not None
 
@@ -57,7 +58,7 @@ class AntiRoleDelete(commands.Cog):
         if await self.is_blacklisted_guild(guild.id):
             return
 
-        async with aiosqlite.connect('db/anti.db') as db:
+        async with aiosqlite.connect(legacy_path('anti.db')) as db:
             async with db.execute("SELECT status FROM antinuke WHERE guild_id = ?", (guild.id,)) as cursor:
                 antinuke_status = await cursor.fetchone()
             if not antinuke_status or not antinuke_status[0]:
@@ -75,7 +76,7 @@ class AntiRoleDelete(commands.Cog):
         if executor.id in {guild.owner_id, self.bot.user.id}:
             return
 
-        async with aiosqlite.connect('db/anti.db') as db:
+        async with aiosqlite.connect(legacy_path('anti.db')) as db:
             async with db.execute("SELECT owner_id FROM extraowners WHERE guild_id = ? AND owner_id = ?", 
                                   (guild.id, executor.id)) as cursor:
                 extra_owner_status = await cursor.fetchone()
