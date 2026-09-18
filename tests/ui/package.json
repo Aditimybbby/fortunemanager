@@ -1,0 +1,1 @@
+{"name":"fortunemanager-ui-tests","private":true,"scripts":{"test":"node smoke.cjs"},"devDependencies":{"jsdom":"26.1.0"}}

@@ -1,0 +1,14 @@
+services:
+  fortunemanager:
+    build: .
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      DASHBOARD_HOST: 0.0.0.0
+      DATA_DIR: /data
+    ports:
+      - "127.0.0.1:8080:8080"
+    volumes:
+      - fortune-data:/data
+volumes:
+  fortune-data:

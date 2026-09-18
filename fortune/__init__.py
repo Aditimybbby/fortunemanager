@@ -1,0 +1,1 @@
+"""FortuneManager services."""
