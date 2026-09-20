@@ -50,25 +50,25 @@ class Context(commands.Context):
     async def send(self,
                    content: Optional[str] = None,
                    **kwargs) -> Optional[discord.Message]:
-        if not (self.channel.permissions_for(self.me)).send_messages:
-            try:
-                await self.author.send(
-                    "bot dont have perms to send msg in that channel")
-            except discord.Forbidden:  
-                pass
+        if self.guild and not self.channel.permissions_for(self.me).send_messages:
             return
+        if "delete_after" not in kwargs:
+            delay = 20
+            if self.guild:
+                config, _ = await self.bot.store.config(self.guild.id)
+                delay = config["reply_delete_after"]
+            view = kwargs.get("view")
+            if view is not None and view.timeout is None:
+                delay = 0  # Published persistent controls must remain usable.
+            elif view is not None and delay:
+                delay = max(delay, view.timeout + 5)
+            kwargs["delete_after"] = delay or None
         return await super().send(content, **kwargs)
 
     async def reply(self,
                     content: Optional[str] = None,
                     **kwargs) -> Optional[discord.Message]:
-        if not (self.channel.permissions_for(self.me)).send_messages:
-            try:
-                await self.author.send(
-                    "bot dont have perms to send msg in that channel")
-            except discord.Forbidden:  
-                pass
-            return
+        # commands.Context.reply delegates to self.send, including cleanup.
         return await super().reply(content, **kwargs)
 
     async def error(self, message, **kwargs):

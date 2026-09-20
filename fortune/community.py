@@ -4,6 +4,7 @@ from discord.ext import commands
 from .branding import embed
 from .permissions import check_role
 from .settings import DASHBOARD_URL
+from .configuration import validate_prefix
 
 log = logging.getLogger(__name__)
 
@@ -130,14 +131,36 @@ class Community(commands.Cog):
     @commands.command()
     @commands.guild_only()
     @commands.has_guild_permissions(manage_guild=True)
-    async def prefix(self, ctx, value: str):
-        if not 1 <= len(value) <= 8 or value.isspace():
-            raise commands.BadArgument("Use a prefix of 1–8 visible characters.")
+    async def prefix(self, ctx, value: str = None):
+        """Show or replace this server's only prefix. Example: prefix !"""
+        if value is None:
+            config, _ = await self.bot.store.config(ctx.guild.id)
+            return await ctx.send(embed=embed("Server prefix", f'Prefix: `{config["prefix"]}`.'))
+        value = validate_prefix(value)
         async with self.bot.guild_locks[ctx.guild.id]:
             config, version = await self.bot.store.config(ctx.guild.id)
             config["prefix"] = value
             await self.bot.store.save_config(ctx.guild.id, config, version)
         await ctx.send(embed=embed("Prefix updated", f"Your new prefix is `{value}`."))
+
+    @commands.command()
+    @commands.guild_only()
+    @commands.has_guild_permissions(manage_guild=True)
+    async def autodelete(self, ctx, seconds: int = None):
+        """Set reply cleanup in seconds (1–3600; 0 disables). Default: 20 seconds."""
+        if seconds is not None and not 0 <= seconds <= 3600:
+            raise commands.BadArgument("Choose 0–3600 seconds; 0 disables reply cleanup.")
+        async with self.bot.guild_locks[ctx.guild.id]:
+            config, version = await self.bot.store.config(ctx.guild.id)
+            if seconds is not None:
+                config["reply_delete_after"] = seconds
+                await self.bot.store.save_config(ctx.guild.id, config, version)
+        delay = config["reply_delete_after"]
+        await ctx.send(embed=embed("Reply cleanup", (
+            f"Normal command replies disappear after **{delay} seconds**. "
+            "Interactive menus remain for their full timeout. Published panels and logs stay."
+            if delay else "Automatic command-reply deletion is disabled."
+        )))
 
     @commands.command()
     @commands.guild_only()
@@ -154,12 +177,8 @@ class Community(commands.Cog):
     @commands.guild_only()
     @commands.has_guild_permissions(manage_guild=True)
     async def modulestatus(self, ctx):
-        """Show which Olympus modules loaded and which need attention."""
+        """Show the loaded moderation, event, and utility modules."""
         status = embed('Module status', f'Loaded commands: **{len(list(self.bot.walk_commands()))}**\n'
-                       f'Olympus modules loaded: **{len(self.bot.legacy_loaded)}**')
-        status.add_field(name='Failed modules', value=', '.join(self.bot.legacy_failures) or 'None', inline=False)
-        if self.bot.legacy_failures:
-            status.add_field(name='Next step', value='Install requirements.txt, check the startup log, and restart. LEGACY_COGS=all enables the full server feature set.', inline=False)
-        elif not self.bot.legacy_loaded:
-            status.add_field(name='Original modules disabled', value='Set LEGACY_COGS=all and restart.', inline=False)
+                       f'Modules: **{len(self.bot.cogs)}**')
+        status.add_field(name='Loaded', value=', '.join(self.bot.cogs), inline=False)
         await ctx.send(embed=status)

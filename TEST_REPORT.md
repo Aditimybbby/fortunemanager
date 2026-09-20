@@ -1,57 +1,28 @@
-# Verification report
+# Cleanup release verification
 
-## Result
+## Results
 
-- **50 backend tests passed.**
-- Frontend DOM smoke suite passed with no JavaScript runtime errors.
-- All Python source files compiled successfully.
-- Frontend JavaScript passed `node --check`.
-- Core startup loaded Staff, Moderation, Tickets, and Community: **31 registered prefix commands**, including subcommands; aliases are additional.
-- Global source scan found no remaining previous-brand text in the delivered source/config/documentation.
-
-Environment: Python 3.12, discord.py 2.7.1, aiohttp 3.14.3, aiosqlite 0.22.1, python-dotenv 1.2.3. The tests use temporary databases and do not contact Discord or act on real members.
+- Python 3.12; discord.py 2.7.1; aiohttp 3.14.3.
+- `python -m pytest -q`: **274 passed** (5.94 seconds).
+- `npm test --prefix tests/ui`: **passed**; no dashboard JavaScript runtime errors.
+- Offline startup: **9 core cogs**, **126 registered prefix commands/subcommands**, **14 hybrid slash-command roots**. The public command reference includes 125 non-hidden commands/subcommands.
+- Removed **280 PNGs** and six other bundled image/font assets. Entertainment cogs and their dependency stack are absent.
 
 ## Covered behavior
 
-- Core cog/command registration and persistent controls.
-- SQLite settings persistence, per-server isolation, and concurrent version conflicts.
-- Per-user/per-server staff grants, denial of unselected permissions, native moderator fallback, administrator access, and revocation.
-- Staff role assignment and database save; failure prevents a grant record from being saved.
-- Green/gray permission toggles and selector ownership checks.
-- Target role hierarchy and refusal of dangerous staff/self-assigned roles.
-- Mute/timeout parsing and Discord's 28-day upper limit.
-- Universal author/logo/timestamp/default image serialization while retaining custom image content.
-- Settings validation, cross-server channel rejection, invalid URLs/colors/IDs, and embed length budgets.
-- Private ticket creation; concurrent repeated submissions create only one channel.
-- Cleanup after failed ticket creation.
-- Close/export/reopen/claim behavior; unauthorized members cannot close another member's ticket.
-- Staff ticket access is removed when its grant is revoked.
-- Persistent panel registrations survive a bot restart.
-- Channel unlocking restores the saved three-state permission values and preserves unrelated overwrites.
-- Reaction roles add/remove on the correct message and ignore another channel.
-- Login requirement, OAuth state/cookie binding, single-use state, HTTP-only sessions, and logout.
-- CSRF and Origin enforcement on dashboard writes.
-- Live membership/Manage Server/Administrator checks using mocked Discord responses.
-- Cross-server transcript denial and precision-safe Discord snowflake serialization.
-- Support-role overwrite failures do not commit misleading dashboard settings.
-- Saved custom embeds send their fields with mentions disabled.
-- Frontend server selection, welcome preview, HTML escaping, dirty/save state, staff selection/grant saving, combined-panel editing, updated publish-panel labels, reaction-role IDs, custom embed fields, and activity-log rendering.
+- Only registered commands at the beginning of a message execute. Unknown commands, bare prefixes, mention prefixes, ordinary punctuation, and embedded prefixes stay silent.
+- Consecutive prefix changes remove old prefixes; per-server isolation and saved configuration are preserved.
+- Strict anti-spam detects rapid messages, repeated messages, repeated words/phrases within one message, long character runs, and message edits.
+- Instant-ban words are normalized, match literal boundaries, delete the message, and ban the author. Whole-word false positives, Unicode/whitespace variants, permissions, hierarchy, ordinary exemptions, observe/disabled modes, management-command exemptions, and add/remove/list persistence are covered.
+- A stronger ban overrides a recent timeout's cooldown. Concurrent/repeated message delivery does not duplicate the action or execute a blocked command.
+- Spam cleanup deletes the author's offending burst without deleting another member's messages. Deletion and ban failures are recorded separately. Attachment-only edits are rechecked.
+- Reply cleanup applies to send/reply, is configurable, respects an explicit delay, and keeps interactive/persistent controls usable.
+- Core antinuke containment/recovery, staff permissions, moderation, events/reward accounting, ticket workflows, proof attachments, dashboard authentication, configuration validation, and optimistic locking still pass their existing regressions.
+- Role management checks native permissions, grantable capabilities, and hierarchy. Dashboard instant-ban edits require Ban Members.
+- Dashboard smoke test covers the new repetition/banword/cleanup controls along with existing settings, tickets, staff, and security configuration.
 
 ## Limits
 
-No bot token, OAuth application credentials, or test Discord server were provided. Actual Discord login, delivery, moderation, gateway behavior, and hosted deployment have not been live-verified. The browser environment blocked the local preview address, so rendered screenshots/responsive visual QA were unavailable; frontend verification used jsdom and mocked API responses.
+Discord API calls are mocked, with real command parsing, SQLite storage, policy evaluation, and local dashboard handlers. This update has not logged into a live Discord server or been deployed to Railway. Live channel permissions, role hierarchy, Gateway delivery, Discord rate limits, and timer execution during host restarts remain deployment-dependent.
 
-The retained optional legacy feature collection is not covered by these tests and is disabled by default. External AI/music services were not contacted. The provided signed image URLs are kept in configuration; image downloads failed in the build environment. Replace them with durable URLs as described in README.
-
-Python 3.12 emits one upstream `audioop` deprecation warning from discord.py's voice module during tests. It does not fail core startup or the test suite.
-
-## Repeat
-
-```sh
-python -m pip install -r requirements-dev.txt
-python -m pytest -q tests
-python -m compileall -q .
-node --check fortune/web/app.js
-npm ci --prefix tests/ui
-npm test --prefix tests/ui
-```
+The only Python warning was discord.py's upstream deprecation warning for Python's `audioop` module. The bot does not load music or voice commands.

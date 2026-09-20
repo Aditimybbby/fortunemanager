@@ -1,5 +1,6 @@
 import copy
 import re
+import unicodedata
 from urllib.parse import urlparse
 import discord
 from .permissions import admin, check_role
@@ -47,6 +48,13 @@ def identifier(value, label):
     return value
 
 
+def validate_prefix(value):
+    text(value, "Prefix", 8, 1)
+    if any(c.isspace() or unicodedata.category(c).startswith("C") for c in value):
+        raise ValueError("Use a prefix of 1–8 visible characters without spaces.")
+    return value
+
+
 def validate_config(raw, guild, actor, previous):
     if not isinstance(raw, dict):
         raise ValueError("Settings must be an object.")
@@ -77,9 +85,11 @@ def validate_config(raw, guild, actor, previous):
             raise ValueError("Select up to 20 roles.")
         return list(dict.fromkeys(role(v, safe) for v in values if v))
 
-    result["prefix"] = text(raw.get("prefix", "-"), "Prefix", 8, 1)
-    if result["prefix"].isspace():
-        raise ValueError("Prefix cannot be whitespace.")
+    result["prefix"] = validate_prefix(raw.get("prefix", DEFAULT_CONFIG["prefix"]))
+    result["reply_delete_after"] = integer(
+        raw.get("reply_delete_after", previous.get("reply_delete_after", 20)),
+        "Reply deletion delay", 0, 3600,
+    )
     result["staff_role_id"] = snowflake(raw.get("staff_role_id"), "Staff role")
     if result["staff_role_id"] != previous["staff_role_id"]:
         if not admin(actor):

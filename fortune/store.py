@@ -10,6 +10,7 @@ from .settings import DEFAULT_PREFIX
 
 DEFAULT_CONFIG = {
     "prefix": DEFAULT_PREFIX,
+    "reply_delete_after": 20,
     "staff_role_id": None,
     "log_channel_id": None,
     "greet": {

@@ -16,6 +16,7 @@ class FortuneManager(commands.Bot):
     def __init__(self, *, database=None, start_dashboard=True, load_legacy=True):
         install_branding()
         intents = discord.Intents.default()
+        intents.moderation = True
         intents.members = True
         intents.message_content = True
         intents.presences = os.getenv("ENABLE_PRESENCES", "0") == "1"
@@ -38,16 +39,14 @@ class FortuneManager(commands.Bot):
         self.dashboard_server = None
         self.start_dashboard = start_dashboard
         self.load_legacy = load_legacy
-        self.legacy_failures = []
-        self.legacy_errors = {}
-        self.legacy_loaded = []
 
     async def resolve_prefix(self, bot, message):
         prefix = settings.DEFAULT_PREFIX
         if message.guild:
             config, _ = await self.store.config(message.guild.id)
             prefix = config["prefix"]
-        return commands.when_mentioned_or(*dict.fromkeys([prefix, "."]))(self, message)
+        # Exactly one prefix: no permanent dot fallback or mention prefixes.
+        return prefix
 
     async def setup_hook(self):
         await self.store.init()
@@ -58,13 +57,19 @@ class FortuneManager(commands.Bot):
         from .community import Community
         from .tracking import Tracking
         from .events import Events
+        from .security import Antinuke
+        from .automod import Automod
+        from .server_tools import ServerTools
 
-        for cls in (Staff, Moderation, Tickets, Community, Tracking, Events):
-            await self.add_cog(cls(self))
         if self.load_legacy:
-            from .legacy import load
-
-            await load(self)
+            from .legacy_storage import prepare_databases
+            await asyncio.to_thread(prepare_databases)
+        for cls in (Antinuke, Automod, ServerTools, Staff, Moderation, Tickets, Community, Tracking, Events):
+            cog = cls(self)
+            if cls in (Antinuke, Automod, ServerTools):
+                for command in cog.walk_commands():
+                    command.ignore_extra = False
+            await self.add_cog(cog)
         from .help import OlympusHelp
         self.help_command = OlympusHelp()
         if self.start_dashboard and os.getenv("ENABLE_DASHBOARD", "1") == "1":
@@ -80,17 +85,27 @@ class FortuneManager(commands.Bot):
 
     async def on_ready(self):
         await self.change_presence(
-            activity=discord.Game(f"{settings.DEFAULT_PREFIX}help | .gg/fortuneleaf")
+            activity=discord.Game(f"{settings.DEFAULT_PREFIX}help")
         )
         log.info(
             "FortuneManager connected as %s in %s servers", self.user, len(self.guilds)
         )
 
+    async def on_message(self, message):
+        if message.author.bot or message.webhook_id:
+            return
+        automod = self.get_cog('Automod')
+        if automod and await automod.handle(message):
+            return
+        # Resolve a registered command at the start of the message. A stray
+        # prefix, ordinary punctuation, and unknown command names stay silent.
+        ctx = await self.get_context(message)
+        if ctx.valid:
+            await self.invoke(ctx)
+
     async def on_command_error(self, ctx, error):
         if isinstance(error, commands.CommandNotFound):
-            return await ctx.send(embed=embed('Unknown command',
-                f'Use `{ctx.clean_prefix}help` to see the loaded commands. '
-                'If an original module is missing, an administrator can use `modulestatus`.'))
+            return
         error = getattr(error, "original", error)
         if isinstance(error, commands.MissingRequiredArgument):
             message = f"Missing `{error.param.name}`. Use `{ctx.clean_prefix}help {ctx.command.qualified_name}`."
@@ -108,6 +123,8 @@ class FortuneManager(commands.Bot):
             ),
         ):
             message = str(error)
+        elif isinstance(error, commands.UserInputError):
+            message = f"Check the arguments. Use `{ctx.clean_prefix}help {ctx.command.qualified_name}` for usage."
         elif isinstance(error, discord.Forbidden):
             message = "Discord denied this action. Check my permissions and place my role above the target role."
         elif isinstance(error, discord.NotFound):
@@ -130,15 +147,8 @@ class FortuneManager(commands.Bot):
         if self.dashboard_server:
             await self.dashboard_server.close()
             self.dashboard_server = None
-        # Allow old cogs to cancel tasks before the shared HTTP session closes.
-        from .legacy import cleanup
         for name in list(self.cogs):
-            cog = self.get_cog(name)
-            try:
-                await self.remove_cog(name)
-            finally:
-                if name in self.legacy_loaded:
-                    await cleanup(cog)
+            await self.remove_cog(name)
         if self.session and not self.session.closed:
             await self.session.close()
         await super().close()

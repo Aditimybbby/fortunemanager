@@ -31,6 +31,9 @@ DANGEROUS = (
     "mute_members",
     "deafen_members",
     "move_members",
+    "manage_expressions",
+    "manage_events",
+    "manage_threads",
 )
 
 
@@ -100,3 +103,10 @@ def check_role(role, actor, *, safe=False):
         raise ValueError(
             "Use a role without moderation or administrative permissions. The bot enforces the selected grants."
         )
+    if safe:
+        for channel in role.guild.channels:
+            allow, _ = channel.overwrites_for(role).pair()
+            if any(getattr(allow, permission, False) for permission in DANGEROUS):
+                raise ValueError(
+                    "This role has moderation permissions in a channel. Choose a role without those permissions."
+                )

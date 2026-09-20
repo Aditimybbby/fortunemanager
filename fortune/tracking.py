@@ -166,7 +166,7 @@ class Tracking(commands.Cog):
             event_summary = (f'\nThis event, before {"ticket" if claim else "now"}: **{len(counted)}** before rule deductions.\n'
                              f'Before event: **{excluded["before_event"]}**; after cutoff: **{excluded["after_cutoff"]}**.\n')
         await ctx.send(embed=embed(f'Invites · {member.display_name}',
-            f'All-time verified joins: **{row["total"]}**\nEver left: **{row["left"] or 0}**\nRejoined: **{row["rejoined"] or 0}**\n{event_summary}Event eligibility is calculated inside your event ticket with `.check`.\nUnattributed and vanity joins are excluded.'))
+            f'All-time verified joins: **{row["total"]}**\nEver left: **{row["left"] or 0}**\nRejoined: **{row["rejoined"] or 0}**\n{event_summary}Event eligibility is calculated inside your event ticket with `{ctx.clean_prefix}check`.\nUnattributed and vanity joins are excluded.'))
 
     @commands.command(aliases=['msgs'])
     @commands.guild_only()

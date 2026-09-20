@@ -201,3 +201,69 @@ async def test_failed_support_overwrite_does_not_commit_config(tmp_path, monkeyp
         )
         assert r.status == 403
     assert (await d.bot.store.config(100))[0]["ticket"]["support_role_ids"] == ["40"]
+
+async def security_webclient(tmp_path,monkeypatch):
+    from fortune.security_engine import SecurityEngine
+    from fortune.automod import Automod
+    client,d,w,h=await webclient(tmp_path,monkeypatch)
+    engine=SecurityEngine(d.bot);await engine.data.init()
+    automod=Automod(d.bot)
+    cogs={'Antinuke':NS(engine=engine),'Automod':automod}
+    d.bot.get_cog=cogs.get
+    return client,d,w,h,engine,automod
+
+@pytest.mark.asyncio
+async def test_security_dashboard_owner_code_csrf_and_version(tmp_path,monkeypatch):
+    client,d,w,h,e,a=await security_webclient(tmp_path,monkeypatch)
+    async with client:
+        response=await client.get('/api/guilds/100/security')
+        assert response.status==200
+        body=await response.json();body['policy']['enabled']=True
+        response=await client.put('/api/guilds/100/security',json=body,headers=h)
+        assert response.status==400
+        code=await e.data.issue_code(100,1)
+        body['code']=code
+        response=await client.put('/api/guilds/100/security',json=body,headers={})
+        assert response.status==403
+        response=await client.put('/api/guilds/100/security',json=body,headers=h)
+        assert response.status==200
+        saved=await response.json();assert saved['policy']['enabled'] and saved['version']==1
+        body['version']=1
+        assert (await client.put('/api/guilds/100/security',json=body,headers=h)).status==400
+        w.staff.guild_permissions.administrator=True
+        d.sessions['test']['user']['id']='2'
+        assert (await client.get('/api/guilds/100/security')).status==403
+        assert (await client.put('/api/guilds/100/security',json=body,headers=h)).status==403
+        assert (await client.get('/api/guilds/101/security')).status==404
+
+@pytest.mark.asyncio
+async def test_security_confirmation_expires_and_is_bound_to_guild(tmp_path,monkeypatch):
+    client,d,w,h,e,a=await security_webclient(tmp_path,monkeypatch)
+    async with client:
+        policy,version=await e.data.policy(100)
+        code=await e.data.issue_code(101,1)
+        assert (await client.put('/api/guilds/100/security',headers=h,json=dict(policy=policy,version=version,code=code))).status==400
+        code=await e.data.issue_code(100,1)
+        await d.bot.store.execute('UPDATE security_confirm SET expires=0 WHERE guild_id=100')
+        assert (await client.put('/api/guilds/100/security',headers=h,json=dict(policy=policy,version=version,code=code))).status==400
+        assert (await e.data.policy(100))[1]==0
+
+@pytest.mark.asyncio
+async def test_automod_dashboard_validation_and_manage_server_permission(tmp_path,monkeypatch):
+    client,d,w,h,e,a=await security_webclient(tmp_path,monkeypatch)
+    w.staff.guild_permissions.manage_guild=True
+    d.sessions['test']['user']['id']='2'
+    async with client:
+        response=await client.get('/api/guilds/100/automod');assert response.status==200
+        body=await response.json();body['config']['enabled']=True
+        body['config']['ignored_channels']=['999']
+        assert (await client.put('/api/guilds/100/automod',json=body,headers=h)).status==400
+        body['config']['ignored_channels']=[];body['config']['rules']['spam']['action']='unknown'
+        assert (await client.put('/api/guilds/100/automod',json=body,headers=h)).status==400
+        body['config']['rules']['spam']['action']='timeout'
+        response=await client.put('/api/guilds/100/automod',json=body,headers=h)
+        assert response.status==200
+        assert (await response.json())['config']['enabled']
+        assert (await client.put('/api/guilds/100/automod',json=body,headers=h)).status==400
+        w.staff.guild_permissions.manage_guild=False
+        assert (await client.get('/api/guilds/100/automod')).status==403

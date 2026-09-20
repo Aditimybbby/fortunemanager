@@ -4,7 +4,7 @@ from datetime import timedelta
 import discord
 from discord.ext import commands
 from .branding import embed
-from .permissions import require, check_target, allowed
+from .permissions import require, check_target, check_role, allowed
 from .store import now
 
 
@@ -59,6 +59,41 @@ class DeleteConfirm(discord.ui.View):
 class Moderation(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
+
+    @commands.group(invoke_without_command=True)
+    @commands.guild_only()
+    @commands.has_guild_permissions(manage_roles=True)
+    @commands.bot_has_guild_permissions(manage_roles=True)
+    async def role(self, ctx):
+        """Add or remove a member's role: role add @member @role; role remove @member @role."""
+        await ctx.send_help(ctx.command)
+
+    async def change_role(self, ctx, member, role, add):
+        check_target(ctx.author, member)
+        check_role(role, ctx.author)
+        if not (ctx.author.id == ctx.guild.owner_id or ctx.author.guild_permissions.administrator):
+            # Manage Roles is not permission to grant capabilities you do not hold.
+            if role.permissions.value & ~ctx.author.guild_permissions.value:
+                raise commands.CheckFailure("You cannot manage a role that grants permissions you do not have.")
+        operation = member.add_roles if add else member.remove_roles
+        await operation(role, reason=reason_for(ctx, "Role management"), atomic=True)
+        await self.result(ctx, "role.add" if add else "role.remove", member, str(role))
+
+    @role.command(name="add")
+    @commands.guild_only()
+    @commands.has_guild_permissions(manage_roles=True)
+    @commands.bot_has_guild_permissions(manage_roles=True)
+    async def role_add(self, ctx, member: discord.Member, role: discord.Role):
+        """Assign a role below both your highest role and the bot's role."""
+        await self.change_role(ctx, member, role, True)
+
+    @role.command(name="remove")
+    @commands.guild_only()
+    @commands.has_guild_permissions(manage_roles=True)
+    @commands.bot_has_guild_permissions(manage_roles=True)
+    async def role_remove(self, ctx, member: discord.Member, role: discord.Role):
+        """Remove a role below both your highest role and the bot's role."""
+        await self.change_role(ctx, member, role, False)
 
     async def result(self, ctx, action, target, reason=""):
         await self.bot.store.audit(

@@ -23,7 +23,9 @@
 
 No token or Railway account was available during development, so deployment and real Discord delivery have not been performed. The archive is prepared for you to deploy.
 
-Storage remains the existing **SQLite** database at `/data/fortune.db`, using WAL and serialized short transactions. All new tables are additive; existing guild settings, staff, tickets, warnings, and dashboard data remain intact. Back up the mounted directory with a SQLite-aware backup or stop the bot first so the database and WAL are consistent. Restored Olympus modules now keep their separate SQLite files under `/data/legacy`; they load by default. See `FIXES_AND_UPGRADE.md` for migration instructions.
+Storage remains the existing **SQLite** database at `/data/fortune.db`, using WAL and serialized short transactions. All new tables are additive; existing guild settings, staff, tickets, warnings, and dashboard data remain intact. Back up the mounted directory with a SQLite-aware backup or stop the bot first so the database and WAL are consistent. The former entertainment modules have been removed. `/data/legacy` is used only for one-time import of prior Antinuke/Automod settings. See `FIXES_AND_UPGRADE.md` for migration instructions.
+
+Examples use the default `.` prefix. After changing the prefix, use the new prefix in all examples; the old prefix stops working.
 
 ## Tracking commands
 
@@ -164,6 +166,6 @@ python -m pip install -r requirements-dev.txt
 python -m pytest -q
 ```
 
-Tests use temporary SQLite files and mocked Discord interactions. See `UPDATE_TEST_REPORT.md` for the result and the live checks still needed. The original `TEST_REPORT.md` records the previous version's checks.
+Tests use temporary SQLite files and mocked Discord interactions. See `TEST_REPORT.md` for the current offline verification results. Live Discord delivery remains unverified.
 
 Primary references: [Railway volumes](https://docs.railway.com/volumes), [Railway configuration](https://docs.railway.com/config-as-code/reference), [Discord gateway intents](https://docs.discord.com/developers/events/gateway), [Discord guild/member API](https://docs.discord.com/developers/resources/guild).

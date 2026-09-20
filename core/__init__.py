@@ -1,4 +1,4 @@
-# Import Context first: legacy utils import it while the bot class is loading.
+# Keep the command context available through the original core import path.
 from .Context import Context
 from .Cog import Cog
 from fortune.bot import FortuneManager

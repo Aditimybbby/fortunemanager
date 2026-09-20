@@ -1,2 +1,0 @@
-# Backwards-compatible install command; requirements.txt now includes Olympus dependencies.
--r requirements.txt

@@ -76,6 +76,7 @@ def world():
     category.id = 200
     category.name = "Tickets"
     category.permissions_for.return_value = discord.Permissions.all()
+    category.overwrites_for.return_value = discord.PermissionOverwrite()
     channel = MagicMock(spec=discord.TextChannel)
     channel.id = 300
     channel.guild = guild
@@ -170,7 +171,7 @@ async def test_bootstrap_registers_all_requested_commands(tmp_path):
             "help",
         ]:
             assert bot.get_command(name), name
-        assert len(bot.persistent_views) == 2
+        assert len(bot.persistent_views) == 3
         assert bot.persistent_views[0].is_persistent()
 
 
@@ -294,17 +295,17 @@ def test_role_and_member_hierarchy():
         check_role(w.role, w.owner, safe=True)
 
 
-def test_branding_applies_to_all_embeds_but_preserves_custom_content():
+def test_embeds_keep_authors_and_explicit_images_without_forced_branding():
     install_branding()
     e = discord.Embed(title="Hello")
     e.set_author(name="Old author")
     e.set_image(url="https://example.com/welcome.png")
     d = e.to_dict()
-    assert d["author"]["name"] == ".gg/fortuneleaf"
-    assert d["timestamp"]
-    assert d["thumbnail"]["url"]
+    assert d["author"]["name"] == "Old author"
+    assert "timestamp" not in d
+    assert "thumbnail" not in d
     assert d["image"]["url"] == "https://example.com/welcome.png"
-    assert "image" in discord.Embed(title="Default").to_dict()
+    assert "image" not in discord.Embed(title="Default").to_dict()
 
 
 def test_configuration_rejects_cross_server_channels_and_unsafe_roles():
@@ -508,7 +509,7 @@ async def test_published_panels_are_registered_after_restart(tmp_path):
         database=path, start_dashboard=False, load_legacy=False
     ) as bot:
         await bot.setup_hook()
-        assert len(bot.persistent_views) == 3
+        assert len(bot.persistent_views) == 4
         assert all(view.is_persistent() for view in bot.persistent_views)
 
 
@@ -547,8 +548,8 @@ async def test_kick_command_enforces_saved_permission_check(tmp_path):
     bot = await service(tmp_path)
     w = world()
     cog = Moderation(bot)
-    ctx = NS(bot=bot, guild=w.guild, author=w.staff)
+    ctx = NS(bot=bot, guild=w.guild, author=w.staff, bot_permissions=w.guild.me.guild_permissions)
     with pytest.raises(commands.CheckFailure):
-        await cog.kick.checks[0](ctx)
+        await discord.utils.async_all(check(ctx) for check in cog.kick.checks)
     await bot.store.save_staff(100, 2, {"kick"}, 40, 1)
-    assert await cog.kick.checks[0](ctx)
+    assert await discord.utils.async_all(check(ctx) for check in cog.kick.checks)

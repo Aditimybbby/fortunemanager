@@ -12,7 +12,7 @@ async def main():
         raise SystemExit(
             "Missing DISCORD_TOKEN. Copy .env.example to .env and add your bot token."
         )
-    # Legacy modules use relative asset/database paths; normalize once at entry.
+    # Keep paths predictable for local and container deployments.
     os.chdir(settings.ROOT)
     async with FortuneManager() as bot:
         await bot.start(settings.TOKEN)

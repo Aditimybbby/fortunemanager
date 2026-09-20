@@ -1,4 +1,4 @@
-"""Offline regressions for the actual Olympus integration and event eligibility."""
+"""Offline regressions for the lean release and preserved event eligibility."""
 import asyncio
 import json
 from datetime import timedelta
@@ -16,25 +16,26 @@ from test_core import world
 from test_events import setup, active_event, claim, REWARDS
 
 
-async def test_full_olympus_startup_help_and_antinuke(tmp_path, monkeypatch):
+async def test_lean_startup_help_and_antinuke(tmp_path, monkeypatch):
     monkeypatch.chdir(Path(__file__).resolve().parents[1])
     monkeypatch.setenv('LEGACY_DATA_DIR', str(tmp_path/'legacy'))
-    # Existing deployments often have an empty LEGACY_COGS setting.
-    monkeypatch.setenv('LEGACY_COGS', '')
+    # An old environment must not bring removed commands back.
+    monkeypatch.setenv('LEGACY_COGS', 'all')
     async with FortuneManager(database=tmp_path/'fortune.db',start_dashboard=False) as bot:
         await bot.setup_hook()
         w=world()
         w.channel.permissions_for.side_effect=lambda member: member.guild_permissions
         bot._connection.user=NS(id=w.guild.me.id, display_avatar=NS(url='https://example.com/avatar.png'))
-        assert not bot.legacy_failures, bot.legacy_errors
         for name in ('help','h','antinuke','anti','automod','whitelist','unwhitelist',
-                     'extraowner','nightmode','emergency','role','greet','autorole',
-                     'afk','gstart','play','check','event','invites','modulestatus'):
+                     'extraowner','emergency','ban','warn','ticket','tag','remindme',
+                     'verification','banwords','check','event','invites','modulestatus'):
             assert bot.get_command(name),name
+        for name in ('play','ship','blackjack','slots','imagine','gstart','afk','autoresponder','snipe'):
+            assert bot.get_command(name) is None,name
         for name in ('AntiBan','AntiChannelDelete','AntiRoleDelete','AntiSpam','AntiLink'):
-            assert bot.get_cog(name),name
+            assert bot.get_cog(name) is None,name
         assert bot.get_command('ban').cog.__class__.__module__=='fortune.moderation'
-        assert bot.get_cog('OlympusModeration')
+        assert bot.get_cog('OlympusModeration') is None
 
         async def context(content,author=None):
             message=MagicMock(spec=discord.Message)
@@ -79,39 +80,24 @@ async def test_full_olympus_startup_help_and_antinuke(tmp_path, monkeypatch):
         assert 'Antinuke' in ctx.send.call_args.kwargs['embed'].title
         ctx=await context('.antinuke',w.target)
         bot.get_command('antinuke').reset_cooldown(ctx)
-        with pytest.raises(commands.MissingPermissions):
+        with pytest.raises(commands.CheckFailure):
             await ctx.command.invoke(ctx)
-        # Run the original enable/disable command with Discord I/O mocked.
-        w.guild.create_role=AsyncMock(return_value=w.role)
-        w.guild.edit_role_positions=AsyncMock()
         ctx=await context('.antinuke enable')
-        bot.get_command('antinuke').reset_cooldown(ctx)
-        with patch('cogs.commands.antinuke.asyncio.sleep',new=AsyncMock()):
-            await ctx.command.invoke(ctx)
-        anti=bot.get_cog('Antinuke')
-        row=await (await anti.db.execute('SELECT status FROM antinuke WHERE guild_id=?',(w.guild.id,))).fetchone()
-        assert row[0]==1
-        # An actual original event listener reacts when enabled.
-        async def audit_logs(**kwargs):
-            yield NS(target=w.target,user=w.staff,created_at=discord.utils.utcnow())
-        w.guild.audit_logs=audit_logs
-        w.guild.ban=AsyncMock();w.guild.unban=AsyncMock()
-        await bot.get_cog('AntiBan').on_member_ban(w.guild,w.target)
-        w.guild.ban.assert_awaited_once_with(w.staff,reason='Member Ban | Unwhitelisted User')
-        ctx=await context('.antinuke disable')
-        bot.get_command('antinuke').reset_cooldown(ctx)
         await ctx.command.invoke(ctx)
-        assert await (await anti.db.execute('SELECT status FROM antinuke WHERE guild_id=?',(w.guild.id,))).fetchone() is None
-        # Re-preparing persisted DBs must not undo edits.
+        engine=bot.get_cog('Antinuke').engine
+        assert (await engine.data.policy(w.guild.id))[0]['enabled']
+        ctx=await context('.antinuke disable')
+        await ctx.command.invoke(ctx)
+        assert not (await engine.data.policy(w.guild.id))[0]['enabled']
         prepare_databases()
-        assert await (await anti.db.execute('SELECT status FROM antinuke WHERE guild_id=?',(w.guild.id,))).fetchone() is None
+        assert not (await engine.data.policy(w.guild.id))[0]['enabled']
         ctx=await context('.automod')
         await ctx.command.invoke(ctx)
         assert ctx.send.await_count
         unknown=await context('.notarealcommand')
         await bot.on_command_error(unknown,commands.CommandNotFound('notarealcommand'))
-        assert unknown.send.call_args.kwargs['embed'].title=='Unknown command'
-        print(f'Full startup: {len(bot.legacy_loaded)} Olympus modules, {len(list(bot.walk_commands()))} commands, zero load failures.')
+        unknown.send.assert_not_awaited()
+        assert len(bot.cogs) == 9
 
 
 def test_event_window_compares_instants_and_preserves_ticket_boundary():

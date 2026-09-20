@@ -290,7 +290,7 @@ class Events(commands.Cog):
     async def event(self,ctx):
         """Build an event: edit embed → rewards → rules → category → publish. event end closes it."""
         if await self.active(ctx.guild.id):
-            raise ValueError('An event is already active. Use `.event end` before starting another.')
+            raise ValueError(f'An event is already active. Use `{ctx.clean_prefix}event end` before starting another.')
         view=Builder(self,ctx.author.id)
         await ctx.send(content='Edit the event embed, then select Next: rewards.',embed=event_embed(view.data),view=view)
 
@@ -421,7 +421,9 @@ class Events(commands.Cog):
                 if ticket_cog:
                     await self.bot.store.execute("INSERT OR IGNORE INTO tickets(guild_id,owner_id,channel_id,panel_id,option_id,status,created_at) VALUES(?,?,?,?,?,'open',?)",
                         (guild.id,member.id,channel.id,f'event:{event["id"]}','event',cutoff))
-                await channel.send(view=TicketControls(ticket_cog) if ticket_cog else None,embed=embed('Event reward ticket','Run `.check` and select Server promo or DM promo, then choose your reward.\nOnly invites gained before this ticket was opened can count.\nUse `.proof Your title` with an image attachment for proof. Staff approve rewards after review.'))
+                config, _ = await self.bot.store.config(guild.id)
+                prefix = config['prefix']
+                await channel.send(view=TicketControls(ticket_cog) if ticket_cog else None,embed=embed('Event reward ticket',f'Run `{prefix}check` and select Server promo or DM promo, then choose your reward.\nOnly invites gained before this ticket was opened can count.\nUse `{prefix}proof Your title` with an image attachment for proof. Staff approve rewards after review.'))
             except Exception:
                 # Keep a created channel's identity and cutoff for recovery; never create duplicate claims.
                 if channel is None and not previous:
@@ -469,7 +471,7 @@ class Events(commands.Cog):
         async with self.bot.channel_locks[ctx.channel.id]:
             claim=await self.claim_for(ctx)
         if claim['status']!='pending':
-            return await ctx.send(embed=embed('Claim already reviewed',f'Status: **{claim["status"]}**. Staff can use `.eventreview reopen reason` if needed.'))
+            return await ctx.send(embed=embed('Claim already reviewed',f'Status: **{claim["status"]}**. Staff can use `{ctx.clean_prefix}eventreview reopen reason` if needed.'))
         await ctx.send(embed=embed('Promotion type','Are these Server promo or DM promo invites?'),view=PromoView(self,claim,ctx.author.id))
 
     async def evaluate(self,guild,claim):
@@ -570,9 +572,9 @@ class Events(commands.Cog):
     async def eventrule(self,ctx,code: str='list',quantity: int=1,*,reason: str=''):
         """Inside a claim ticket: eventrule <code> <quantity> <evidence/reason>. eventrule list lists codes."""
         if code=='list':
-            return await ctx.send(embed=embed('Rule codes',', '.join(f'`{key}`' for key in MANUAL_RULES)+'\nRecord: `.eventrule invalid 1 evidence`\nRemove an incorrect finding: `.eventunflag ID reason`'))
+            return await ctx.send(embed=embed('Rule codes',', '.join(f'`{key}`' for key in MANUAL_RULES)+f'\nRecord: `{ctx.clean_prefix}eventrule invalid 1 evidence`\nRemove an incorrect finding: `{ctx.clean_prefix}eventunflag ID reason`'))
         if code not in MANUAL_RULES or not 1<=quantity<=10000 or not reason.strip():
-            raise ValueError('Use `.eventrule <code> <quantity 1–10000> <evidence/reason>`. See `.eventrule list`.')
+            raise ValueError(f'Use `{ctx.clean_prefix}eventrule <code> <quantity 1–10000> <evidence/reason>`. See `{ctx.clean_prefix}eventrule list`.')
         async with self.bot.channel_locks[ctx.channel.id]:
             claim=await self.claim_for(ctx)
             if claim['status']!='pending':
@@ -580,7 +582,7 @@ class Events(commands.Cog):
             fid=await self.bot.store.execute('INSERT INTO event_findings(event_id,user_id,code,quantity,reason,actor_id,created_at) VALUES(?,?,?,?,?,?,?)',
                 (claim['event_id'],claim['user_id'],code,quantity,reason[:1500],ctx.author.id,now()))
         await self.bot.store.audit(ctx.guild.id,ctx.author.id,'event.finding',f'{fid}: {code}: {reason}')
-        await ctx.send(embed=embed('Finding recorded',f'Finding #{fid}: {code} × {quantity}. Re-run `.check` for the updated calculation. Ban findings require a separate staff moderation decision.'))
+        await ctx.send(embed=embed('Finding recorded',f'Finding #{fid}: {code} × {quantity}. Re-run `{ctx.clean_prefix}check` for the updated calculation. Ban findings require a separate staff moderation decision.'))
 
     @commands.command()
     @require_admin()
@@ -595,7 +597,7 @@ class Events(commands.Cog):
                 raise ValueError('No matching finding in this ticket.')
             await self.bot.store.execute('UPDATE event_findings SET active=0 WHERE id=?',(finding_id,))
         await self.bot.store.audit(ctx.guild.id,ctx.author.id,'event.unflag',f'{finding_id}: {reason}')
-        await ctx.send(embed=embed('Finding removed',f'#{finding_id}. Run `.check` again.'))
+        await ctx.send(embed=embed('Finding removed',f'#{finding_id}. Run `{ctx.clean_prefix}check` again.'))
 
     @commands.command()
     @require_admin()
@@ -612,7 +614,7 @@ class Events(commands.Cog):
                 if not claim['promo']:
                     raise ValueError('Run `.check` first.')
                 if claim.get('selected_reward') is None:
-                    raise ValueError('The ticket owner must choose a reward using `.check` before approval.')
+                    raise ValueError(f'The ticket owner must choose a reward using `{ctx.clean_prefix}check` before approval.')
                 _,data,result=await self.evaluate(ctx.guild,claim)
                 if result['blocked'] or result['tier']!=claim['selected_reward'] or result['reward']=='No reward':
                     raise ValueError('This claim has blocking findings or no reward. Resolve findings before approving.')

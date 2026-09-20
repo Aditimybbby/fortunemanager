@@ -99,7 +99,7 @@ async def claim(bot,w,eid,promo='dm',selected=None):
 
 
 def context(bot,w,author=None):
-    return NS(bot=bot,guild=w.guild,channel=w.channel,author=author or w.owner,send=AsyncMock(),message=NS(attachments=[]))
+    return NS(bot=bot,guild=w.guild,channel=w.channel,author=author or w.owner,clean_prefix=".",send=AsyncMock(),message=NS(attachments=[]))
 
 
 def interaction(w):
@@ -169,7 +169,7 @@ async def test_builder_authorization_and_shared_embed(setup):
     v.data.update(rewards=REWARDS,rules=True)
     embeds=v.preview()
     assert len(embeds)==2 and embeds[1].description==RULES
-    assert embeds[0].to_dict()['author']['name']=='.gg/fortuneleaf'
+    assert 'author' not in embeds[0].to_dict() and 'image' not in embeds[0].to_dict()
     assert 'Rewards' in [f.name for f in embeds[0].fields]
 
 
@@ -288,15 +288,13 @@ async def test_proof_attachment_required_and_destination(setup):
         await Events.proof.callback(c,ctx,title='Must not forward across servers')
 
 
-async def test_dot_prefix_preserves_existing_prefix(setup):
+async def test_configured_prefix_replaces_default_prefix(setup):
     bot,w=setup
     config,version=await bot.store.config(w.guild.id)
     config['prefix']='!'
     await bot.store.save_config(w.guild.id,config,version)
-    # when_mentioned_or needs the logged-in user identity.
-    bot._connection.user=NS(id=99)
     prefixes=await bot.resolve_prefix(bot,NS(guild=w.guild))
-    assert '!' in prefixes and '.' in prefixes
+    assert prefixes == '!'
 
 async def test_chat_check_reset_only_outside_allowed_channels(setup):
     bot,w=setup;c=bot.get_cog('Events');eid=await active_event(bot,w)

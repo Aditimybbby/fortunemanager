@@ -1,239 +1,82 @@
 # FortuneManager
 
-A Discord server-management bot with a Discord-login dashboard, granular staff grants, moderation, private tickets, welcome messages, custom embeds, and reaction roles.
+A streamlined Discord bot for antinuke, moderation, invite events, tickets, and server utilities. Default prefix: `.`. Python 3.12.
 
-**Default prefix: `.`. Python 3.12 recommended.** The bot and dashboard run together with `python main.py`. No Node build, Redis, MongoDB, Lavalink, or paid API is required for the rebuilt core.
+## What changed
 
-## Olympus help and rewards repair
+- Kept Antinuke, Automod, ban/warn/kick/timeout, role management, staff, tickets, invite tracking, events/rewards, proof submissions, verification, tags, reminders, and dashboard configuration.
+- Removed the old entertainment/music/game/image commands, passive chat responders, duplicate legacy command loaders, and all bundled images/fonts. No PNG assets or image-generation dependencies remain. Event proof attachments and deliberately configured announcement images are still supported.
+- Commands run only when a registered command follows the active prefix at the **start** of a message. Unknown commands, bare prefixes, mentions, and prefixes inside ordinary conversation receive no command reply. Moderation still checks ordinary messages.
+- A prefix change **replaces** the previous prefix. There is no permanent `.` fallback or mention prefix.
+- Ordinary command responses auto-delete after **20 seconds** by default. This includes help/error responses; interactive menus last until their timeout plus five seconds. Published ticket/event/verification panels, proof records, announcements, reminders, and audit logs remain available.
 
-This build restores the Olympus category help menu and loads the original server features by default. Read **[FIXES_AND_UPGRADE.md](FIXES_AND_UPGRADE.md)** before updating an existing installation. Use `.help`, `.help antinuke`, and `.modulestatus` after restart.
-
-## New: Railway, invite events, and tracking
-
-Read **[RAILWAY_AND_EVENTS.md](RAILWAY_AND_EVENTS.md)** for Railway deployment, `.event` setup, reward examples, invite/message tracking, `.check`, `.proof`, and the automatic-versus-manual rule table. SQLite data is preserved on a mounted Railway volume. Existing configured prefixes continue to work; `.` is also always accepted.
-
-## Start here
-
-1. Extract this folder. Install Python 3.12.
-2. Create a virtual environment and install the dependencies:
-
-   ```sh
-   python -m venv .venv
-   # Windows:
-   .venv\Scripts\activate
-   # Linux / macOS:
-   source .venv/bin/activate
-   python -m pip install -r requirements.txt
-   ```
-
-3. Copy `.env.example` to `.env`. Set `DISCORD_TOKEN` to **your own bot token**. The older `TOKEN` environment variable is also accepted. Do not share this file.
-4. In the [Discord Developer Portal](https://discord.com/developers/applications), enable **Server Members Intent** and **Message Content Intent** under Bot. The core does not need Presence Intent. Rename your application/bot to **FortuneManager** there if its Discord profile still has the previous name; source-code branding does not change your Discord application profile.
-5. Invite the bot with these permissions: View Channels, Send Messages, Embed Links, Attach Files, Read Message History, Manage Server (for invite tracking), Add Reactions, Kick Members, Ban Members, Moderate Members, Manage Messages, Manage Nicknames, Manage Channels, and Manage Roles. Administrator is not required for the rebuilt core; the original antinuke setup requires it and must be run by the server owner or an assigned extra owner.
-6. Put the bot's role above the staff role and any members/roles it needs to manage.
-7. Run:
-
-   ```sh
-   python main.py
-   ```
-
-8. In a server, run `.help`. For immediate staff setup:
-
-   ```text
-   .staffrole @Staff
-   .staff @wumpus
-   ```
-
-   Select permissions: green means selected. Press **Done**. The bot saves the per-server grants in SQLite and assigns the configured role.
-
-A missing token produces an explicit startup message. Do not paste your token into source files.
-
-## Dashboard setup
-
-The dashboard includes server selection, welcome previews, a standalone embed builder, staff management, ticket configuration and combined panels, reaction-role mappings, transcript downloads, and an audit log.
-
-For local use, set:
-
-```dotenv
-DISCORD_CLIENT_ID=your_application_id
-DISCORD_CLIENT_SECRET=your_oauth2_client_secret
-DASHBOARD_URL=http://localhost:8080
-DASHBOARD_HOST=127.0.0.1
-DASHBOARD_PORT=8080
-```
-
-In Developer Portal → OAuth2, register this **exact** redirect:
-
-```text
-http://localhost:8080/auth/callback
-```
-
-Open `http://localhost:8080` on the machine running the bot and select **Continue with Discord**. This uses the `identify` and `guilds` OAuth scopes. Your client secret and access tokens remain server-side.
-
-For a public dashboard, use a persistent Python/VPS/container host and a TLS reverse proxy. Set `DASHBOARD_URL=https://your-domain.example` and register `https://your-domain.example/auth/callback`. Set `DASHBOARD_HOST=0.0.0.0` only when your hosting/proxy requires it. The public URL must use HTTPS. The OAuth client secret is different from the bot token.
-
-The bot maintains a persistent Discord connection; do not deploy this as a static site or an ordinary short-lived serverless function. No domain has been deployed or connected by this package.
-
-A server owner, administrator, or member with **Manage Server** can configure that server. Only the owner or an administrator can assign staff or change the staff role. Membership and permissions are checked again against Discord for every server API request. Settings include version checks to prevent one browser tab silently overwriting another.
-
-## Commands
-
-Use your configured prefix in place of `-` in the older examples below; `.` is always accepted. These are **prefix commands**, not slash commands.
-
-| Command | Purpose / required staff grant |
-| --- | --- |
-| `-staff @member` | Administrator opens the permission selector |
-| `-staff list` | Administrator lists assigned staff |
-| `-staff remove @member` | Administrator removes saved grants and assigned staff role |
-| `-staffrole @role` | Administrator chooses the staff role |
-| `-kick @member [reason]` | Kick |
-| `-ban @member [reason]` / `-unban USER_ID [reason]` | Ban / unban |
-| `-mute @member 10m [reason]` | Mute using Discord's timeout; default 10 minutes |
-| `-timeout @member 2h [reason]` | Timeout |
-| `-unmute @member [reason]` / `-untimeout @member` | Clear timeout; uses the Mute / unmute grant |
-| `-warn @member reason` / `-warnings @member` | Warn and view recent warnings |
-| `-purge 20` / `-clear 20` | Delete up to 100 messages |
-| `-lock [#channel]` / `-unlock [#channel]` | Lock / unlock |
-| `-deletechannel [#channel]` / `-delchannel [#channel]` | Delete channels; asks for confirmation |
-| `-slowmode 10 [#channel]` | Set slowmode; use `0` to disable |
-| `-nickname @member [new nickname]` / `-nick` | Change or reset nickname |
-| `-ticket setup CATEGORY_ID [@Support]` | Administrator enables tickets with a default panel |
-| `-ticket panel [#channel] [panel_id]` | Manage Server: publish a saved panel; default ID is `support` |
-| `-ticket add @member` / `-ticket remove @member` | Ticket manager adds/removes a participant |
-| `-dashboard` | Dashboard link |
-| `-prefix !` | Manage Server: change the command prefix |
-| `-greettest` | Manage Server: preview the saved greeting in the current channel |
-| `-help [command]` / `-ping` | Help / connectivity |
-
-Category channels do not have normal text-channel mentions. Use the category ID or its quoted name for `ticket setup`.
-
-### Staff rules
-
-- Grants are stored per guild and user. A grant in one server never applies in another.
-- The configured staff role should have **no native administrative or moderation permissions**. It identifies staff; the bot enforces the individual grants.
-- Choose Kick, Ban, Mute, Timeout, Warn, Delete messages, Lock, Delete channels, Slowmode, Ticket access, Manage tickets, and Change nicknames independently.
-- Assigned staff use their saved grant list for the rebuilt commands. Non-assigned native moderators can use commands matching their Discord permissions. Server owners/administrators retain full access.
-- Discord's own role hierarchy and the bot's permissions still apply. Staff cannot moderate members at or above their highest role. Administrator members cannot be timed out.
-- Staff grants control **bot commands**. They cannot remove native Discord permissions a member already has through other roles.
-- A staff role cannot also be a self-assigned reaction role, automatic join role, or broad ticket support role.
-- Changing the configured staff role does not automatically move every staff member. Save each member again to move their assignment from the old role.
-- Removing bot grants does not remove unrelated roles or their native permissions.
-
-## Tickets
-
-Quick setup:
-
-```text
--ticket setup CATEGORY_ID @Support
--ticket panel #open-a-ticket
-```
-
-For a combined panel, open Dashboard → Ticket system:
-
-1. Enable tickets; choose the default category, optional support roles, transcript log, and open-ticket limit.
-2. Add a panel. Choose **Dropdown menu** or **Buttons**.
-3. Add categories such as General support, Billing, Reports, and Partnerships. Each can use its own Discord category override. Up to 25 choices per panel and 10 saved panels per server.
-4. Save changes, then select the panel and destination and publish.
-
-A member chooses a category and submits a subject and description. The bot creates a private channel with explicit access for the owner, bot, configured support roles, and staff with ticket grants. It does not inherit arbitrary category role visibility.
-
-Controls inside a ticket:
-
-- **Claim:** ticket managers/support staff assign the conversation to themselves. Another manager cannot silently steal an existing claim.
-- **Close:** the owner or a ticket manager confirms closure. A transcript is saved and the owner/added participants become read-only.
-- **Transcript:** the owner, ticket staff with access, or a manager exports the conversation.
-- **Reopen:** managers reopen a closed ticket, subject to the member's open-ticket limit.
-- **Delete:** managers confirm deletion of a closed channel; the saved transcript remains.
-
-`Ticket access` grants channel visibility and conversation access. `Manage tickets` also permits claim/reopen/delete and participant changes. Support roles can manage all tickets. Administrators always retain Discord's native access. Ticket controls and published panels are registered again on startup.
-
-Publishing creates a **new message**; existing panels keep their published snapshot. To retire an old panel, delete its Discord message. Disabling tickets stops new tickets from all panels. Changing support roles updates active/closed ticket-channel overwrites before settings are committed; a failed update is reported instead of silently saving the change.
-
-Transcripts are plain UTF-8 text including message content, embed text, authors, timestamps, and attachment links. Export is capped at the first 10,000 messages or approximately 7 MB, with a visible truncation marker. Attachments are linked, not downloaded; their remote availability is not guaranteed. Transcripts are saved under `DATA_DIR/transcripts/<guild_id>/` and can be downloaded by server managers from the dashboard after export/closure.
-
-## Welcome messages, embeds, and reaction roles
-
-**Welcome messages:** select a channel, enable the greeting, edit the text/embed, and optionally choose join roles. Variables are `{user}`, `{username}`, `{server}`, `{member_count}`, and `{user_id}`. Only the joining user can be pinged by a welcome message. Join roles work independently of the greeting toggle.
-
-**Message embeds:** save a reusable announcement draft with a destination, plain message, title, description, color, optional image, and up to 25 fields. Use **Send embed to Discord** after saving. Every send creates a new message, with mentions disabled.
-
-**Reaction roles:** add emoji/role/channel mappings. Leave the message ID blank and use **Publish reaction panel** to create a new panel (up to 20 reactions per message), or enter existing message IDs and use **Add reactions to saved messages**. Reactions grant a role; removing the reaction removes it. The bot needs Add Reactions, Read Message History, and Manage Roles. Managed, dangerous, and staff roles are rejected. Removing a mapping stops automation but does not bulk-remove roles from existing members. Reactions missed while the bot is offline are not replayed automatically.
-
-## Branding
-
-All serialized bot embeds receive:
-
-- Author: **.gg/fortuneleaf** with the supplied logo and support link.
-- A timestamp and the supplied logo as thumbnail.
-- The supplied banner as the default image; meaningful custom images, such as a welcome image or avatar result, remain usable.
-- FortuneManager as the default footer.
-
-The supplied image URLs are set as defaults. They are signed Discord attachment links and their supplied `ex` values expire on **2026-09-16 at 23:28:06 UTC**. Set `BRAND_LOGO_URL` and `BRAND_BANNER_URL` to durable public HTTPS image URLs for ongoing operation. Do not assume a copied attachment URL is permanent. The original artwork could not be downloaded in the build environment, so the images are referenced by URL and are not bundled.
-
-## Data, deployment, and backups
-
-The rebuilt core uses `data/fortune/fortune.db`, unless you set `DATA_DIR` to an absolute persistent directory. Old uploaded databases under `db/` are preserved for the retained modules; the core does not import old owner IDs, staff grants, prefix settings, or moderation history automatically. Configure the new dashboard once for each server.
-
-Run **one bot process per data directory/token**. In-process locks coordinate Discord operations; SQLite stores settings, grants, tickets, panel registrations, warnings, lock snapshots, and audit records. Persist the entire data directory and back it up with the process stopped, or use SQLite's backup API. Sessions are intentionally in memory: dashboard users sign in again after a restart.
-
-Docker is optional:
+## Install and run
 
 ```sh
-docker compose up -d --build
+python -m pip install -r requirements.txt
+cp .env.example .env
+python main.py
 ```
 
-The Compose example exposes the dashboard only on the host's loopback port 8080, keeps data in a named volume, and expects a TLS reverse proxy for public access. Its image installs the core and restored Olympus dependencies.
+Set `DISCORD_TOKEN` in `.env`. Enable **Server Members Intent** and **Message Content Intent** in the Discord Developer Portal. The bot needs View Channel, Send Messages, Embed Links, Read Message History, Manage Messages, Ban Members, and Moderate Members for strict message moderation. Grant other capabilities required by the features you use: View Audit Log for antinuke; Manage Channels/Roles for tickets, verification, and recovery. Place the bot role above members it must moderate.
 
-## Restored original features
+To run without the web dashboard, set `ENABLE_DASHBOARD=0`. Otherwise configure the dashboard OAuth application and callback in `.env.example`. `OWNER_IDS` grants deployment-level access to `.synccommands`; it does not replace the server owner's antinuke controls.
 
-The server feature modules in `cogs/` load by default alongside the current staff, ticket, tracking, event, and dashboard services. The interactive help menu lists the commands that actually loaded, with categories, page buttons, aliases, usage, and group subcommands. `.h` is an alias for `.help`.
+## Quick commands
 
-`requirements.txt` includes the Olympus dependencies. `requirements-legacy.txt` remains a compatible alias. In `.env`:
+Replace `.` with your current prefix after changing it.
 
-```dotenv
-LEGACY_COGS=all
-```
+| Command | Result |
+| --- | --- |
+| `.help` | Browse the retained commands |
+| `.automod hard` | Enable strict message moderation and enforce mode |
+| `.automod config` | Review enabled rules and thresholds |
+| `.automod logging #mod-logs` | Record moderation actions and failures |
+| `.banwords add bad phrase` | Add one literal word/phrase, enable moderation/enforce mode; matching messages are deleted and the author is banned |
+| `.banwords remove bad phrase` | Remove that instant-ban entry |
+| `.banwords list` | Show the list and whether enforcement is active |
+| `.automod words add bad phrase` | Existing configurable word filter; default action is deletion |
+| `.prefix !` | Replace `.` with `!`; next command is `!help` |
+| `.prefix` | Show the current prefix |
+| `.autodelete 30` | Delete normal bot replies after 30 seconds |
+| `.autodelete 0` | Disable automatic reply deletion |
+| `.ban @member reason`, `.warn @member reason` | Manual moderation |
+| `.role add @member @role`, `.role remove @member @role` | Manage roles with permission and hierarchy checks |
+| `.event`, `.check`, `.proof Title` | Existing event builder, reward check, and proof flow |
 
-An unset or blank value also loads the full supported server feature set. Use `LEGACY_COGS=none` for the smaller core, or a comma-separated list of original class names from `fortune/legacy_modules.json`. Selecting `Antinuke` also loads its whitelist commands and protection listeners; selecting `Automod` loads its enforcement listeners.
+`banwords add/remove` requires **Manage Server and Ban Members**. Other automod configuration requires Manage Server. New servers start with automod disabled until `.automod enable`, `.automod hard`, or `.banwords add` is used.
 
-Core command names take precedence where names overlap. Other original moderation commands are registered under the `OlympusModeration` cog to avoid a cog-name collision. Original global bot-owner controls, the old no-prefix system, duplicate help/error handlers, and hardcoded join advertising remain excluded. Loading protection modules does not turn protection on for new servers; `.antinuke enable` and `.automod` retain their configuration and permission checks. Existing saved module settings are preserved.
+## Strict moderation behavior
 
-Original feature databases now live in `DATA_DIR/legacy` (on Railway, `/data/legacy`). The first run copies the bundled/existing `db/*.db` using SQLite backup; subsequent starts keep the persisted copy. Set `LEGACY_DATA_DIR` only if a different persistent location is needed. Initialization is awaited before commands become available, and connections/background tasks close on shutdown.
+`.automod hard` enables these defaults:
 
-Run `.modulestatus` as a server manager to see load failures. The full help also flags failures; unknown commands return a response. Startup logs contain the detailed exception.
+- Four messages in five seconds, or three matching messages in 30 seconds: delete the detected burst and timeout the author for one hour.
+- Four consecutive copies of a word/phrase **inside one message**, or a 12-character alphanumeric run: delete and timeout for one hour. Case, whitespace, and common zero-width differences are normalized.
+- Mass mentions/everyone mentions and emoji spam: delete and timeout. Invite, blocked-domain, and risky-attachment rules are enabled. Existing word lists, domain lists, logging, and configured exemptions are preserved.
 
-Music/AI and other provider-backed commands still need their service endpoints, credentials, and assets. Provider operations and live Discord actions were not exercised by the offline tests. Original server commands retain their own Discord permission checks; staff grants in the dashboard apply to the rebuilt command set. Legacy greeting/autorole settings are separate from dashboard settings, so configure each feature through one interface to avoid duplicate greetings/role additions. Old custom emoji IDs may depend on access to their original emoji servers.
+Use `.automod limit repeat_count 5`, `.automod limit repeat_characters 15`, or `.automod limit timeout_seconds 600` to tune the limits. `.automod rule repetition on timeout` controls the same-message repetition rule separately.
+
+`banwords` matches literal whole words/phrases, ignoring case, full-width character variants, common zero-width characters, and repeated whitespace. A word does not match unrelated larger words. These are literal filters, not semantic detection or exhaustive anti-evasion matching.
+
+Instant-ban words apply despite ordinary role/channel exemptions, including to administrators below the bot role. The server owner, bots, and webhooks are exempt. Authorized automod/list management commands are exempt so moderators can edit/test the lists. Ordinary spam rules retain the existing administrator and configured role/channel exemptions. `.automod mode observe` logs without deleting/punishing; `.automod disable` pauses the pipeline, including banwords.
+
+All enforced violations are deleted even if Discord refuses the punishment. A failed deletion does not prevent an attempted ban; failures are recorded. Message and attachment edits are checked. A prior timeout never suppresses a stronger banned-word ban. Discord role hierarchy and permissions still limit what the bot can do.
+
+## Upgrade an existing deployment
+
+Stop the old process. Keep your existing `.env`, `DATA_DIR`, and any custom `LEGACY_DATA_DIR` or deployed `db/` files. Replace program files from this ZIP, reinstall `requirements.txt`, and restart one process. Do not overwrite deployed databases with seed files from the ZIP.
+
+Existing `fortune.db` settings, warnings, tickets, invite counts, events, and security policies remain intact. Old saved automod configurations gain the new repetition rule and an empty instant-ban list without losing existing choices. The first migration can still import legacy Antinuke/Automod settings from persisted `anti.db`/`automod.db`. `LEGACY_COGS` no longer loads additional modules, even if an old environment sets it to `all`.
+
+If you previously published slash commands, the deployment owner can run `.synccommands` to refresh the command list. Prefix commands do not require syncing. See `RAILWAY_AND_EVENTS.md` for Railway volumes and the existing event workflow; `SECURITY_GUIDE.md` describes antinuke settings.
 
 ## Verification
 
 ```sh
 python -m pip install -r requirements-dev.txt
-python -m pytest -q tests
-```
-
-Frontend DOM tests are optional and require Node 20 or newer:
-
-```sh
+python -m pytest -q
 npm ci --prefix tests/ui
 npm test --prefix tests/ui
 ```
 
-See `FIXES_AND_UPGRADE.md` for the current checks and limits; `TEST_REPORT.md` and `UPDATE_TEST_REPORT.md` describe earlier builds. These tests use local SQLite databases, mocked Discord objects, and mocked HTTP/OAuth responses. A successful test run is not a claim of a live Discord deployment.
-
-Suggested live acceptance check after setup: save a staff member with only Kick, verify Ban is denied, remove the grant, publish a ticket panel, open/claim/close/reopen a ticket, restart the bot and reuse the old panel, test a welcome, send an embed, and add/remove a reaction role.
-
-## Troubleshooting
-
-- **Prefix commands do not respond:** check Message Content Intent, the configured prefix, bot channel visibility/send permissions, and startup logs. Restart after changing `.env`.
-- **`-staff` reports a role problem:** configure a normal staff role below the bot, without native moderation permissions; make sure your own top role can manage the target.
-- **Timeout/ban/kick denied:** check both the bot's native permissions and role order. Discord does not let an administrator be timed out.
-- **Dashboard redirect fails:** its registered OAuth redirect must exactly match `DASHBOARD_URL + /auth/callback`, including protocol and port.
-- **Dashboard shows no server:** your account needs Manage Server or Administrator, and the bot needs to be invited to that server.
-- **A button shows an error:** check the console and channel permissions. Existing ticket controls recover on restart; a temporary staff selector expires after five minutes and should be reopened.
-- **Artwork stops loading:** replace the signed attachment links with durable image URLs.
-- **Original module missing:** run `.modulestatus`, install `requirements.txt`, set `LEGACY_COGS=all`, and restart. Review the startup log if a module still fails.
-
-## Implementation references
-
-- [discord.py persistent views and API](https://discordpy.readthedocs.io/en/stable/api.html)
-- [Discord OAuth2 authorization-code flow](https://docs.discord.com/developers/topics/oauth2)
-- [Discord API reference and attachment CDN behavior](https://docs.discord.com/developers/reference)
+Tests use temporary SQLite databases and mocked Discord I/O. See `TEST_REPORT.md`. No real member is banned by these tests. A live Discord deployment has not been exercised for this update.

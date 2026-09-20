@@ -73,6 +73,10 @@ class Dashboard:
                     "/api/guilds/{guild_id}/transcripts/{ticket_id}", self.transcript
                 ),
                 web.get("/api/guilds/{guild_id}/audit", self.audit),
+                web.get("/api/guilds/{guild_id}/security", self.get_security),
+                web.put("/api/guilds/{guild_id}/security", self.save_security),
+                web.get("/api/guilds/{guild_id}/automod", self.get_automod),
+                web.put("/api/guilds/{guild_id}/automod", self.save_automod),
             ]
         )
 
@@ -312,6 +316,8 @@ class Dashboard:
                 break
             after = max((g["id"] for g in guilds), key=int)
         permissions = discord.Permissions(
+            manage_guild=True,
+            view_audit_log=True,
             kick_members=True,
             ban_members=True,
             manage_channels=True,
@@ -329,7 +335,7 @@ class Dashboard:
         return web.json_response(
             {
                 "guilds": result,
-                "invite": f"https://discord.com/oauth2/authorize?client_id={settings.CLIENT_ID}&scope=bot&permissions={permissions.value}",
+                "invite": f"https://discord.com/oauth2/authorize?client_id={settings.CLIENT_ID}&scope=bot%20applications.commands&permissions={permissions.value}",
             }
         )
 
@@ -666,6 +672,69 @@ class Dashboard:
             (guild.id,),
         )
         return web.json_response(json_safe({"events": rows}))
+
+    async def get_security(self, request):
+        guild, member = await self.context(request)
+        if member.id != guild.owner_id:
+            raise web.HTTPForbidden(text='Only the server owner can open security settings.')
+        engine = self.bot.get_cog('Antinuke').engine
+        policy, version = await engine.data.policy(guild.id)
+        incidents = await self.bot.store.rows('SELECT * FROM security_incidents WHERE guild_id=? ORDER BY id DESC LIMIT 30', (guild.id,))
+        jobs = await self.bot.store.rows('SELECT id,kind,status,error FROM security_jobs WHERE guild_id=? ORDER BY id DESC LIMIT 30', (guild.id,))
+        return web.json_response(json_safe(dict(policy=policy, version=version,
+            health=engine.health(guild), incidents=incidents, jobs=jobs)))
+
+    async def save_security(self, request):
+        guild, member = await self.context(request)
+        if member.id != guild.owner_id:
+            raise web.HTTPForbidden(text='Only the server owner can change security settings.')
+        body = await self.body(request)
+        if type(body.get('version')) is not int:
+            raise ValueError('A policy version is required.')
+        if not isinstance(body.get('code'), str) or not body['code']:
+            raise ValueError('Run antinuke dashboard in Discord for a single-use confirmation code.')
+        from .security_policy import validate_policy
+        policy = validate_policy(body.get('policy'))
+        self.check_security_channel(guild, policy['log_channel_id'])
+        engine = self.bot.get_cog('Antinuke').engine
+        version = await engine.data.save(guild.id,policy,body['version'],member.id,confirmation=body['code'])
+        return web.json_response(json_safe(dict(policy=policy,version=version)))
+
+    def check_security_channel(self, guild, channel_id):
+        if channel_id:
+            channel = guild.get_channel(int(channel_id))
+            if not isinstance(channel,discord.TextChannel):
+                raise ValueError('Choose a text channel in this server.')
+            permissions = channel.permissions_for(guild.me)
+            if not permissions.send_messages or not permissions.embed_links:
+                raise ValueError('The bot needs Send Messages and Embed Links in the log channel.')
+
+    async def get_automod(self, request):
+        guild, member = await self.context(request)
+        config, version = await self.bot.get_cog('Automod').config_for(guild.id)
+        return web.json_response(json_safe(dict(config=config,version=version)))
+
+    async def save_automod(self, request):
+        guild, member = await self.context(request)
+        body = await self.body(request)
+        if type(body.get('version')) is not int:raise ValueError('A settings version is required.')
+        from .automod import validate_config as validate_automod
+        config = validate_automod(body.get('config'))
+        automod = self.bot.get_cog('Automod')
+        previous, _ = await automod.config_for(guild.id)
+        if config['ban_words'] != previous['ban_words']:
+            if member.id != guild.owner_id and not (member.guild_permissions.administrator or member.guild_permissions.ban_members):
+                raise web.HTTPForbidden(text='Ban Members is required to change instant-ban words.')
+            if config['ban_words']:
+                if not (guild.me.guild_permissions.ban_members and guild.me.guild_permissions.manage_messages):
+                    raise ValueError('The bot needs Ban Members and Manage Messages for instant-ban words.')
+        self.check_security_channel(guild, config['log_channel_id'])
+        if any(not guild.get_channel(i) for i in config['ignored_channels']):raise ValueError('Ignored channels must belong to this server.')
+        for rid in config['ignored_roles']:
+            role = guild.get_role(rid)
+            if not role or role.is_default():raise ValueError('Choose server roles other than everyone for exemptions.')
+        version = await automod.save(guild.id,config,body['version'],member.id)
+        return web.json_response(json_safe(dict(config=config,version=version)))
 
     async def start(self):
         parsed = urlparse(settings.DASHBOARD_URL)
